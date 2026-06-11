@@ -1,0 +1,482 @@
+const GROUP_ID = "816998268";
+
+const els = {
+  status: document.querySelector("#status"),
+  onebotState: document.querySelector("#onebotState"),
+  modelState: document.querySelector("#modelState"),
+  refreshBtn: document.querySelector("#refreshBtn"),
+  dateInput: document.querySelector("#dateInput"),
+  searchInput: document.querySelector("#searchInput"),
+  adminPassword: document.querySelector("#adminPassword"),
+  generateBtn: document.querySelector("#generateBtn"),
+  pushBtn: document.querySelector("#pushBtn"),
+  syncHistoryBtn: document.querySelector("#syncHistoryBtn"),
+  progressFill: document.querySelector("#progressFill"),
+  progressText: document.querySelector("#progressText"),
+  totalMessages: document.querySelector("#totalMessages"),
+  activeUsers: document.querySelector("#activeUsers"),
+  sentiment: document.querySelector("#sentiment"),
+  riskLevel: document.querySelector("#riskLevel"),
+  summaryState: document.querySelector("#summaryState"),
+  summaryBox: document.querySelector("#summaryBox"),
+  reportCount: document.querySelector("#reportCount"),
+  reportList: document.querySelector("#reportList"),
+  messageCount: document.querySelector("#messageCount"),
+  feed: document.querySelector("#feed"),
+  imageModal: document.querySelector("#imageModal"),
+  imageModalClose: document.querySelector("#imageModalClose"),
+  imageModalImg: document.querySelector("#imageModalImg")
+};
+
+function today() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function query(extra = {}) {
+  return new URLSearchParams({
+    date: els.dateInput.value || today(),
+    group_id: GROUP_ID,
+    ...extra
+  }).toString();
+}
+
+function messageQuery(extra = {}) {
+  return new URLSearchParams({
+    group_id: GROUP_ID,
+    ...extra
+  }).toString();
+}
+
+async function api(path, options) {
+  const response = await fetch(path, options);
+  const data = await response.json();
+  if (!response.ok && !data.summary) throw new Error(data.error || "请求失败");
+  return data;
+}
+
+function adminHeaders() {
+  return {
+    "content-type": "application/json",
+    "x-admin-password": els.adminPassword.value
+  };
+}
+
+function saveAdminPassword() {
+  localStorage.setItem("qq-monitor-admin-password", els.adminPassword.value);
+}
+
+function setPill(node, text, state = "ok") {
+  node.textContent = text;
+  node.className = state;
+}
+
+function setProgress(percent, text, state = "") {
+  els.progressFill.style.width = `${percent}%`;
+  els.progressText.textContent = text;
+  els.progressText.className = state;
+}
+
+function setActionBusy(busy) {
+  els.generateBtn.disabled = busy;
+  els.pushBtn.disabled = busy;
+  els.syncHistoryBtn.disabled = busy;
+}
+
+const SUMMARY_SECTIONS = new Set([
+  "一句话总结",
+  "代表性发言 / 玩家反馈",
+  "全群问题 / 风险",
+  "舆论",
+  "平衡性 / 夸大与失真",
+  "建议关注动作"
+]);
+
+function appendInlineText(parent, text) {
+  const parts = String(text || "").split(/(\*\*[^*]+\*\*)/g);
+  for (const part of parts) {
+    if (!part) continue;
+    if (part.startsWith("**") && part.endsWith("**")) {
+      const strong = document.createElement("strong");
+      strong.textContent = part.slice(2, -2);
+      parent.appendChild(strong);
+    } else {
+      parent.appendChild(document.createTextNode(part));
+    }
+  }
+}
+
+function appendParagraph(container, text) {
+  const p = document.createElement("p");
+  const match = String(text).match(/^([^：:]{2,18})([：:])(.+)$/);
+  if (match) {
+    const strong = document.createElement("strong");
+    strong.textContent = `${match[1]}${match[2]}`;
+    p.append(strong, document.createTextNode(match[3]));
+  } else {
+    appendInlineText(p, text);
+  }
+  container.appendChild(p);
+}
+
+function renderReportContent(text) {
+  els.summaryBox.innerHTML = "";
+  const lines = String(text || "").split(/\r?\n/);
+  let list = null;
+
+  const closeList = () => {
+    list = null;
+  };
+
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (!line) {
+      closeList();
+      continue;
+    }
+
+    const heading = line.match(/^(#{1,2})\s*(.+)$/);
+    if (heading) {
+      closeList();
+      const level = heading[1].length === 1 ? "h1" : "h2";
+      const node = document.createElement(level);
+      appendInlineText(node, heading[2]);
+      els.summaryBox.appendChild(node);
+      continue;
+    }
+
+    if (line.startsWith("QQ群玩家日报｜")) {
+      closeList();
+      const node = document.createElement("h1");
+      node.textContent = line;
+      els.summaryBox.appendChild(node);
+      continue;
+    }
+
+    if (SUMMARY_SECTIONS.has(line)) {
+      closeList();
+      const node = document.createElement("h2");
+      node.textContent = line;
+      els.summaryBox.appendChild(node);
+      continue;
+    }
+
+    const listItem = line.match(/^(?:[-*]|\d+[.)、])\s*(.+)$/);
+    if (listItem) {
+      if (!list) {
+        list = document.createElement("ol");
+        els.summaryBox.appendChild(list);
+      }
+      const item = document.createElement("li");
+      appendInlineText(item, listItem[1]);
+      list.appendChild(item);
+      continue;
+    }
+
+    closeList();
+    appendParagraph(els.summaryBox, line);
+  }
+}
+
+function renderSummary(summary) {
+  if (!summary) {
+    els.summaryState.textContent = "未生成";
+    els.summaryState.className = "";
+    renderReportContent("当前日期还没有日报。点击右侧“生成日报”开始分析。");
+    return;
+  }
+
+  els.summaryState.textContent = summary.status === "ok" ? "模型版" : "基础分析版";
+  els.summaryState.className = summary.status === "ok" ? "ok" : "warn";
+  renderReportContent(summary.error ? `${summary.content}\n\n提示：${summary.error}` : summary.content);
+}
+
+function isImageAttachment(attachment) {
+  return attachment?.type === "image" && (attachment.url || attachment.file);
+}
+
+function proxiedMediaUrl(attachment) {
+  const params = new URLSearchParams();
+  if (attachment.file) params.set("file", attachment.file);
+  if (attachment.url) params.set("url", attachment.url);
+  return `/api/media?${params.toString()}`;
+}
+
+function openImageModal(src, alt) {
+  els.imageModalImg.src = src;
+  els.imageModalImg.alt = alt || "图片预览";
+  els.imageModal.hidden = false;
+  document.body.classList.add("modal-open");
+}
+
+function closeImageModal() {
+  els.imageModal.hidden = true;
+  els.imageModalImg.removeAttribute("src");
+  document.body.classList.remove("modal-open");
+}
+
+function renderMessageText(content, parts) {
+  const wrapper = document.createElement("div");
+  wrapper.className = "message-content";
+
+  if (parts?.length) {
+    const displayParts = [];
+    for (let index = 0; index < parts.length; index += 1) {
+      const part = parts[index];
+      const next = parts[index + 1];
+      if (part.type === "reply" && next?.type === "mention") {
+        displayParts.push({ ...part, text: `回复 ${next.text}` });
+        index += 1;
+        continue;
+      }
+      displayParts.push(part);
+    }
+
+    for (const part of displayParts) {
+      if (part.type === "mention" || part.type === "reply") {
+        const chip = document.createElement("span");
+        chip.className = `inline-chip ${part.type}`;
+        chip.textContent = part.text;
+        wrapper.appendChild(chip);
+        continue;
+      }
+      wrapper.appendChild(document.createTextNode(part.text || ""));
+    }
+    return wrapper;
+  }
+
+  wrapper.textContent = content || "";
+  return wrapper;
+}
+
+function renderReports(reports) {
+  els.reportCount.textContent = reports.length;
+  els.reportList.innerHTML = "";
+
+  if (!reports.length) {
+    els.reportList.textContent = "暂无历史日报";
+    els.reportList.className = "report-list muted-empty";
+    return;
+  }
+
+  els.reportList.className = "report-list";
+  for (const report of reports) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = report.summaryDate === els.dateInput.value ? "report-item active" : "report-item";
+
+    const date = document.createElement("span");
+    date.textContent = report.summaryDate;
+    const status = document.createElement("small");
+    status.textContent = report.status === "ok" ? "模型版" : "基础版";
+
+    button.append(date, status);
+    button.addEventListener("click", () => {
+      els.dateInput.value = report.summaryDate;
+      refreshReportView();
+    });
+    els.reportList.appendChild(button);
+  }
+}
+
+function renderMessages(messages) {
+  els.messageCount.textContent = `${messages.length} 条`;
+  els.feed.innerHTML = "";
+
+  if (!messages.length) {
+    const empty = document.createElement("div");
+    empty.className = "muted-empty";
+    empty.textContent = "暂无消息";
+    els.feed.appendChild(empty);
+    return;
+  }
+
+  for (const msg of messages) {
+    const card = document.createElement("article");
+    card.className = "message";
+
+    const head = document.createElement("div");
+    head.className = "message-head";
+
+    const name = document.createElement("span");
+    name.className = "message-name";
+    name.textContent = msg.nickname || msg.userId;
+
+    const time = document.createElement("span");
+    time.textContent = new Date(msg.sentAt).toLocaleString();
+    head.append(name, time);
+
+    const images = (msg.attachments || []).filter(isImageAttachment);
+    const cleanContent = String(msg.content || "").replace(/\[image\]/g, "").trim();
+    const content = renderMessageText(cleanContent || (images.length ? "" : msg.content || ""), msg.parts);
+
+    const media = document.createElement("div");
+    media.className = "message-media";
+    for (const image of images) {
+      const link = document.createElement("a");
+      const previewUrl = proxiedMediaUrl(image);
+      link.href = previewUrl;
+
+      const img = document.createElement("img");
+      img.src = previewUrl;
+      img.alt = image.file || "玩家图片";
+      img.loading = "lazy";
+
+      link.addEventListener("click", (event) => {
+        event.preventDefault();
+        openImageModal(previewUrl, img.alt);
+      });
+
+      link.appendChild(img);
+      media.appendChild(link);
+    }
+
+    card.append(head);
+    if (content.textContent) card.appendChild(content);
+    if (images.length) card.appendChild(media);
+    els.feed.appendChild(card);
+  }
+}
+
+async function loadHealth() {
+  const data = await api("/api/health");
+  setPill(els.onebotState, data.onebot.connected ? "已连接" : "未连接", data.onebot.connected ? "ok" : "error");
+  setPill(els.modelState, data.model?.available ? "可用" : "不可用", data.model?.available ? "ok" : "warn");
+
+  const onebot = data.onebot.connected ? "OneBot 已连接" : "OneBot 未连接";
+  const model = data.model?.available ? `${data.model.model} 可用` : data.model?.message || "模型状态未知";
+  els.status.textContent = `${onebot}｜${model}`;
+}
+
+async function loadReports() {
+  const data = await api(`/api/reports?group_id=${GROUP_ID}&limit=120`);
+  renderReports(data.reports);
+}
+
+async function loadDashboard() {
+  const data = await api(`/api/dashboard?${query()}`);
+  const analysis = data.analysis;
+  els.totalMessages.textContent = analysis.totalMessages;
+  els.activeUsers.textContent = data.groupMemberCount ?? "--";
+  els.sentiment.textContent = analysis.sentiment;
+  els.riskLevel.textContent = analysis.riskLevel;
+  renderSummary(data.summary);
+}
+
+async function loadMessages() {
+  const q = els.searchInput.value.trim();
+  const scrollTop = els.feed.scrollTop;
+  const data = await api(`/api/messages?${messageQuery({ q, limit: 5000 })}`);
+  renderMessages(data.messages);
+  els.feed.scrollTop = q ? 0 : scrollTop;
+}
+
+async function refreshAll() {
+  await Promise.all([loadHealth(), loadReports(), loadDashboard(), loadMessages()]);
+}
+
+async function refreshReportView() {
+  await Promise.all([loadHealth(), loadReports(), loadDashboard()]);
+}
+
+async function generateSummary() {
+  saveAdminPassword();
+  setActionBusy(true);
+  els.generateBtn.textContent = "生成中...";
+  setProgress(12, "校验权限...");
+  const timers = [];
+  try {
+    timers.push(setTimeout(() => setProgress(32, "读取消息..."), 150));
+    timers.push(setTimeout(() => setProgress(58, "调用模型..."), 450));
+    const data = await api("/api/summary/generate", {
+      method: "POST",
+      headers: adminHeaders(),
+      body: JSON.stringify({ date: els.dateInput.value || today(), groupId: GROUP_ID })
+    });
+    setProgress(84, "保存日报...");
+    renderSummary(data.summary);
+    await refreshReportView();
+    setProgress(100, "完成", "ok");
+  } catch (error) {
+    setProgress(100, error.message, "error");
+  } finally {
+    timers.forEach(clearTimeout);
+    setActionBusy(false);
+    els.generateBtn.textContent = "生成日报";
+  }
+}
+
+async function pushSummary() {
+  saveAdminPassword();
+  setActionBusy(true);
+  els.pushBtn.textContent = "推送中...";
+  setProgress(20, "校验权限...");
+  try {
+    setProgress(55, "推送到飞书...");
+    await api("/api/summary/push", {
+      method: "POST",
+      headers: adminHeaders(),
+      body: JSON.stringify({ date: els.dateInput.value || today(), groupId: GROUP_ID })
+    });
+    setProgress(100, "已推送到飞书", "ok");
+  } catch (error) {
+    setProgress(100, error.message, "error");
+    throw error;
+  } finally {
+    setActionBusy(false);
+    els.pushBtn.textContent = "推送到飞书";
+  }
+}
+
+async function syncHistory() {
+  saveAdminPassword();
+  setActionBusy(true);
+  els.syncHistoryBtn.textContent = "同步中...";
+  setProgress(20, "校验权限...");
+  try {
+    setProgress(55, "从 NapCat 拉取历史...");
+    const data = await api("/api/messages/sync-history", {
+      method: "POST",
+      headers: adminHeaders(),
+      body: JSON.stringify({ groupId: GROUP_ID, count: 1000 })
+    });
+    await refreshAll();
+    setProgress(100, `已同步 ${data.inserted} 条，读取 ${data.fetched} 条`, "ok");
+  } catch (error) {
+    setProgress(100, error.message, "error");
+  } finally {
+    setActionBusy(false);
+    els.syncHistoryBtn.textContent = "同步历史消息";
+  }
+}
+
+function connectEvents() {
+  const events = new EventSource("/api/events");
+  events.addEventListener("message", () => {
+    loadDashboard();
+    loadMessages();
+  });
+  events.addEventListener("summary", () => refreshReportView());
+}
+
+els.dateInput.value = today();
+els.adminPassword.value = localStorage.getItem("qq-monitor-admin-password") || "";
+els.refreshBtn.addEventListener("click", refreshAll);
+els.generateBtn.addEventListener("click", generateSummary);
+els.pushBtn.addEventListener("click", () => pushSummary().catch(() => {}));
+els.syncHistoryBtn.addEventListener("click", syncHistory);
+els.dateInput.addEventListener("change", refreshReportView);
+els.searchInput.addEventListener("input", () => setTimeout(loadMessages, 100));
+els.imageModalClose.addEventListener("click", closeImageModal);
+els.imageModal.addEventListener("click", (event) => {
+  if (event.target === els.imageModal) closeImageModal();
+});
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && !els.imageModal.hidden) closeImageModal();
+});
+
+connectEvents();
+refreshAll().catch((error) => {
+  els.status.textContent = error.message;
+  els.status.className = "status error";
+});

@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>QQ群日报</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <aside class="left-rail panel">
+        <header class="brand">
+          <span class="status-dot"></span>
+          <div>
+            <h1>QQ群日报</h1>
+            <p>玩家社群监控与日报</p>
+          </div>
+        </header>
+
+        <section class="rail-section">
+          <h2>系统状态</h2>
+          <div class="status-list">
+            <div class="status-row">
+              <span>OneBot</span>
+              <strong id="onebotState">检测中</strong>
+            </div>
+            <div class="status-row">
+              <span>本地模型</span>
+              <strong id="modelState">检测中</strong>
+            </div>
+            <div class="status-row">
+              <span>监控群</span>
+              <strong>#816998268</strong>
+            </div>
+            <div class="status-row">
+              <span>访问控制</span>
+              <strong class="warn-text">无密码</strong>
+            </div>
+          </div>
+        </section>
+
+        <section class="metric-grid">
+          <article class="metric">
+            <strong id="totalMessages">0</strong>
+            <span>消息</span>
+          </article>
+          <article class="metric">
+            <strong id="activeUsers">0</strong>
+            <span>群成员</span>
+          </article>
+          <article class="metric">
+            <strong id="riskLevel">观察</strong>
+            <span>风险</span>
+          </article>
+          <article class="metric">
+            <strong id="sentiment">样本不足</strong>
+            <span>情绪</span>
+          </article>
+        </section>
+
+        <section class="rail-section history-section">
+          <div class="section-title">
+            <h2>历史日报</h2>
+            <span id="reportCount">0</span>
+          </div>
+          <div id="reportList" class="report-list">暂无历史日报</div>
+        </section>
+      </aside>
+
+      <section class="center-stage panel">
+        <header class="stage-toolbar">
+          <div>
+            <h2>#816998268</h2>
+            <p id="status">正在连接本地服务...</p>
+          </div>
+          <div class="toolbar-actions">
+            <input id="dateInput" type="date" />
+            <input id="searchInput" placeholder="搜索玩家、消息或关键词" />
+            <button id="refreshBtn" type="button">刷新</button>
+          </div>
+        </header>
+
+        <div class="content-panels">
+          <article class="report-card">
+            <div class="card-title">
+              <div>
+                <h2>日报</h2>
+                <p id="summaryState">未生成</p>
+              </div>
+            </div>
+            <div id="summaryBox" class="report-content">选择日期后生成日报。模型未启动时会自动生成基础分析版。</div>
+          </article>
+
+          <section class="messages-card">
+            <div class="card-title">
+              <div>
+                <h2>最近消息</h2>
+                <p id="messageCount">0 条</p>
+              </div>
+            </div>
+            <div id="feed" class="message-feed"></div>
+          </section>
+        </div>
+      </section>
+
+      <aside class="right-rail panel">
+        <section class="action-card">
+          <h2>日报生成</h2>
+          <p>每日 00:05 自动生成前一日 QQ 群日报；管理员也可手动生成所选自然日。</p>
+          <input id="adminPassword" type="password" placeholder="管理员密码" autocomplete="current-password" />
+          <button id="generateBtn" type="button" class="primary-action">生成日报</button>
+          <button id="pushBtn" type="button">推送到飞书</button>
+          <button id="syncHistoryBtn" type="button">同步历史消息</button>
+          <div class="progress-wrap">
+            <div class="progress-bar">
+              <span id="progressFill"></span>
+            </div>
+            <p id="progressText">等待操作</p>
+          </div>
+        </section>
+
+        <section class="rail-section">
+          <h2>模型服务</h2>
+          <div class="info-box">
+            <span>接口</span>
+            <strong>Ollama · qwen3:8b</strong>
+          </div>
+          <div class="info-box">
+            <span>地址</span>
+            <strong>127.0.0.1:11434</strong>
+          </div>
+        </section>
+
+        <section class="rail-section">
+          <h2>公网提示</h2>
+          <p class="note">当前站点未启用访问密码。部署到公网后，知道链接的人都可以查看日报和消息摘要。</p>
+        </section>
+
+        <section class="rail-section">
+          <h2>NapCat 上报</h2>
+          <p class="note">服务器部署时，NapCat HTTP 客户端上报地址填写：</p>
+          <code>/onebot</code>
+        </section>
+      </aside>
+    </main>
+
+    <div id="imageModal" class="image-modal" hidden>
+      <button id="imageModalClose" type="button" class="image-modal-close">关闭</button>
+      <img id="imageModalImg" alt="图片预览" />
+    </div>
+
+    <script src="/app.js"></script>
+  </body>
+</html>

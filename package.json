@@ -1,0 +1,14 @@
+{
+  "name": "qq-group-monitor",
+  "version": "0.1.0",
+  "private": true,
+  "description": "本地 QQ 群玩家聊天监控与每日简报工具",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node --no-warnings src/server.js",
+    "test": "node --no-warnings --test"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}

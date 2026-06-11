@@ -1,0 +1,29 @@
+{
+  "server": {
+    "host": "127.0.0.1",
+    "port": 8787
+  },
+  "admin": {
+    "password": "20018001"
+  },
+  "onebot": {
+    "wsUrl": "ws://127.0.0.1:3001",
+    "accessToken": "",
+    "groupIds": [816998268]
+  },
+  "model": {
+    "provider": "ollama",
+    "baseUrl": "http://127.0.0.1:11434",
+    "model": "qwen3:8b",
+    "apiKey": ""
+  },
+  "feishu": {
+    "webhookUrl": "",
+    "secret": ""
+  },
+  "summary": {
+    "dailyTime": "00:05",
+    "timezone": "Asia/Shanghai",
+    "keywords": ["bug", "卡", "外挂", "退款", "充值", "掉线", "封号", "活动", "VPN", "匹配", "下载", "更新"]
+  }
+}
