@@ -35,6 +35,8 @@ let selectedReportDate = "";
 let loadedMessages = [];
 let hasOlderMessages = true;
 let lastMessageQuery = "";
+let cachedReports = [];
+let summaryRequestId = 0;
 
 function today() {
   const d = new Date();
@@ -56,6 +58,11 @@ function currentReportDate() {
 function setSelectedReportDate(date) {
   selectedReportDate = date || "";
   els.reportDateState.textContent = `当前日报：${currentReportDate()}`;
+}
+
+function setReportLoading() {
+  els.summaryState.textContent = "读取中";
+  els.summaryState.className = "warn";
 }
 
 function messageQuery(extra = {}) {
@@ -285,6 +292,7 @@ function renderMessageText(content, parts) {
 }
 
 function renderReports(reports) {
+  cachedReports = reports || [];
   els.reportCount.textContent = reports.length;
   els.reportList.innerHTML = "";
 
@@ -308,6 +316,7 @@ function renderReports(reports) {
     button.append(date, status);
     button.addEventListener("click", () => {
       setSelectedReportDate(report.summaryDate);
+      renderReports(cachedReports);
       refreshReportView();
     });
     els.reportList.appendChild(button);
@@ -391,12 +400,21 @@ async function loadReports() {
 }
 
 async function loadDashboard() {
+  const requestedDate = currentReportDate();
   const data = await api(`/api/dashboard?${query()}`);
+  if (requestedDate !== currentReportDate()) return;
   const analysis = data.analysis;
   els.totalMessages.textContent = analysis.totalMessages;
   els.activeUsers.textContent = data.groupMemberCount ?? "--";
   els.sentiment.textContent = analysis.sentiment;
   els.riskLevel.textContent = analysis.riskLevel;
+  if (data.summary?.summaryDate === currentReportDate()) renderSummary(data.summary);
+}
+
+async function loadSummary() {
+  const requestId = ++summaryRequestId;
+  const data = await api(`/api/summary?${query()}`);
+  if (requestId !== summaryRequestId) return;
   renderSummary(data.summary);
 }
 
@@ -436,12 +454,13 @@ async function loadOlderMessages() {
 
 async function refreshAll() {
   await Promise.all([loadHealth(), loadReports()]);
-  await Promise.all([loadDashboard(), loadMessages()]);
+  await Promise.all([loadSummary(), loadDashboard(), loadMessages()]);
 }
 
 async function refreshReportView() {
-  await Promise.all([loadHealth(), loadReports()]);
-  await loadDashboard();
+  setReportLoading();
+  await loadSummary();
+  loadDashboard().catch(() => {});
 }
 
 async function generateSummary() {
