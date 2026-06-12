@@ -5,7 +5,7 @@ const DEFAULT_CONFIG = {
   server: { host: "127.0.0.1", port: 8787 },
   admin: { password: "20018001" },
   onebot: { wsUrl: "", accessToken: "", groupIds: [] },
-  feishu: { webhookUrl: "", secret: "" },
+  feishu: { webhookUrl: "", testWebhookUrl: "", officialWebhookUrl: "", secret: "" },
   model: {
     provider: "ollama",
     baseUrl: "http://127.0.0.1:11434",

@@ -9,7 +9,8 @@ const els = {
   searchInput: document.querySelector("#searchInput"),
   adminPassword: document.querySelector("#adminPassword"),
   generateBtn: document.querySelector("#generateBtn"),
-  pushBtn: document.querySelector("#pushBtn"),
+  testPushBtn: document.querySelector("#testPushBtn"),
+  officialPushBtn: document.querySelector("#officialPushBtn"),
   syncHistoryBtn: document.querySelector("#syncHistoryBtn"),
   progressFill: document.querySelector("#progressFill"),
   progressText: document.querySelector("#progressText"),
@@ -79,7 +80,8 @@ function setProgress(percent, text, state = "") {
 
 function setActionBusy(busy) {
   els.generateBtn.disabled = busy;
-  els.pushBtn.disabled = busy;
+  els.testPushBtn.disabled = busy;
+  els.officialPushBtn.disabled = busy;
   els.syncHistoryBtn.disabled = busy;
 }
 
@@ -406,25 +408,27 @@ async function generateSummary() {
   }
 }
 
-async function pushSummary() {
+async function pushSummary(target) {
   saveAdminPassword();
   setActionBusy(true);
-  els.pushBtn.textContent = "推送中...";
+  const button = target === "official" ? els.officialPushBtn : els.testPushBtn;
+  const idleText = target === "official" ? "正式推送" : "测试推送";
+  button.textContent = "推送中...";
   setProgress(20, "校验权限...");
   try {
-    setProgress(55, "推送到飞书...");
+    setProgress(55, target === "official" ? "正式推送到飞书..." : "测试推送到飞书...");
     await api("/api/summary/push", {
       method: "POST",
       headers: adminHeaders(),
-      body: JSON.stringify({ date: els.dateInput.value || today(), groupId: GROUP_ID })
+      body: JSON.stringify({ date: els.dateInput.value || today(), groupId: GROUP_ID, target })
     });
-    setProgress(100, "已推送到飞书", "ok");
+    setProgress(100, target === "official" ? "已正式推送到飞书" : "已测试推送到飞书", "ok");
   } catch (error) {
     setProgress(100, error.message, "error");
     throw error;
   } finally {
     setActionBusy(false);
-    els.pushBtn.textContent = "推送到飞书";
+    button.textContent = idleText;
   }
 }
 
@@ -463,7 +467,8 @@ els.dateInput.value = today();
 els.adminPassword.value = localStorage.getItem("qq-monitor-admin-password") || "";
 els.refreshBtn.addEventListener("click", refreshAll);
 els.generateBtn.addEventListener("click", generateSummary);
-els.pushBtn.addEventListener("click", () => pushSummary().catch(() => {}));
+els.testPushBtn.addEventListener("click", () => pushSummary("test").catch(() => {}));
+els.officialPushBtn.addEventListener("click", () => pushSummary("official").catch(() => {}));
 els.syncHistoryBtn.addEventListener("click", syncHistory);
 els.dateInput.addEventListener("change", refreshReportView);
 els.searchInput.addEventListener("input", () => setTimeout(loadMessages, 100));

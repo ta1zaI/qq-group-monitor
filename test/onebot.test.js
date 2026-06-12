@@ -367,6 +367,53 @@ test("pushes saved summary to configured Feishu webhook", async () => {
   }
 });
 
+test("pushes saved summary to official Feishu webhook when requested", async () => {
+  const db = openDatabase(process.cwd(), ":memory:");
+  saveSummary(db, { groupId: "g1", date: "2026-06-10", content: "日报正文" });
+  const calls = [];
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (url, options) => {
+    calls.push({ url: String(url), body: JSON.parse(options.body) });
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({ code: 0, msg: "ok" })
+    };
+  };
+
+  const app = createApp({
+    db,
+    config: {
+      server: { host: "127.0.0.1", port: 0 },
+      admin: { password: "20018001" },
+      onebot: { wsUrl: "", accessToken: "", groupIds: ["g1"] },
+      feishu: {
+        testWebhookUrl: "https://open.feishu.cn/webhook/test",
+        officialWebhookUrl: "https://open.feishu.cn/webhook/official",
+        secret: ""
+      },
+      model: { provider: "ollama", baseUrl: "http://127.0.0.1:11434", model: "qwen3:8b", apiKey: "" },
+      summary: { dailyTime: "10:00", keywords: [] }
+    }
+  });
+  const server = await listen(app);
+  try {
+    const pushed = await request(server, {
+      method: "POST",
+      path: "/api/summary/push",
+      headers: { "content-type": "application/json", "x-admin-password": "20018001" },
+      body: { date: "2026-06-10", groupId: "g1", target: "official" }
+    });
+    assert.equal(pushed.status, 200);
+    assert.equal(pushed.body.target, "official");
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].url, "https://open.feishu.cn/webhook/official");
+  } finally {
+    globalThis.fetch = originalFetch;
+    server.close();
+  }
+});
+
 test("returns readable error when Feishu webhook is missing", async () => {
   const db = openDatabase(process.cwd(), ":memory:");
   saveSummary(db, { groupId: "g1", date: "2026-06-10", content: "日报正文" });

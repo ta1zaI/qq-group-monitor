@@ -350,9 +350,17 @@ function createApp({ rootDir = ROOT, config: injectedConfig, db: injectedDb } = 
     return cachedGroupMemberCount;
   }
 
-  async function pushSummaryToFeishu(summary, window, groupId) {
-    const webhookUrl = config.feishu?.webhookUrl || "";
-    if (!webhookUrl) throw new Error("未配置飞书机器人 webhookUrl");
+  function feishuWebhookForTarget(target = "test") {
+    const normalized = target === "official" ? "official" : "test";
+    const webhookUrl = normalized === "official"
+      ? config.feishu?.officialWebhookUrl || ""
+      : config.feishu?.testWebhookUrl || config.feishu?.webhookUrl || "";
+    if (!webhookUrl) throw new Error(`未配置飞书${normalized === "official" ? "正式" : "测试"}机器人 webhookUrl`);
+    return { target: normalized, webhookUrl };
+  }
+
+  async function pushSummaryToFeishu(summary, window, groupId, target = "test") {
+    const { webhookUrl } = feishuWebhookForTarget(target);
 
     const text = [
       "《全植英雄》官方群日报",
@@ -558,8 +566,9 @@ function createApp({ rootDir = ROOT, config: injectedConfig, db: injectedDb } = 
         return;
       }
       try {
-        await pushSummaryToFeishu(summary, window, groupId);
-        json(res, 200, { ok: true, summary, window });
+        const target = body.target === "official" ? "official" : "test";
+        await pushSummaryToFeishu(summary, window, groupId, target);
+        json(res, 200, { ok: true, summary, window, target });
       } catch (error) {
         json(res, 502, { error: error.message });
       }
@@ -637,11 +646,11 @@ function createApp({ rootDir = ROOT, config: injectedConfig, db: injectedDb } = 
       const groups = groupIdsForDay(db, reportDate).filter((groupId) => shouldAcceptGroup(config, groupId));
       if (!groups.length) {
         const summary = await generateAndSave(reportDate, defaultGroupId(config));
-        if (summary.status === "ok") await pushSummaryToFeishu(summary, summary.window, defaultGroupId(config)).catch(() => {});
+        if (summary.status === "ok") await pushSummaryToFeishu(summary, summary.window, defaultGroupId(config), "official").catch(() => {});
       }
       for (const groupId of groups) {
         const summary = await generateAndSave(reportDate, groupId);
-        if (summary.status === "ok") await pushSummaryToFeishu(summary, summary.window, groupId).catch(() => {});
+        if (summary.status === "ok") await pushSummaryToFeishu(summary, summary.window, groupId, "official").catch(() => {});
       }
       scheduleDailySummary();
     }, next - now);
