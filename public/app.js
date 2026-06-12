@@ -25,12 +25,16 @@ const els = {
   reportList: document.querySelector("#reportList"),
   messageCount: document.querySelector("#messageCount"),
   feed: document.querySelector("#feed"),
+  loadOlderBtn: document.querySelector("#loadOlderBtn"),
   imageModal: document.querySelector("#imageModal"),
   imageModalClose: document.querySelector("#imageModalClose"),
   imageModalImg: document.querySelector("#imageModalImg")
 };
 
 let selectedReportDate = "";
+let loadedMessages = [];
+let hasOlderMessages = true;
+let lastMessageQuery = "";
 
 function today() {
   const d = new Date();
@@ -297,6 +301,7 @@ function renderReports(reports) {
 function renderMessages(messages) {
   els.messageCount.textContent = `${messages.length} 条`;
   els.feed.innerHTML = "";
+  els.loadOlderBtn.hidden = !messages.length || !hasOlderMessages || Boolean(els.searchInput.value.trim());
 
   if (!messages.length) {
     const empty = document.createElement("div");
@@ -383,8 +388,34 @@ async function loadMessages() {
   const q = els.searchInput.value.trim();
   const scrollTop = els.feed.scrollTop;
   const data = await api(`/api/messages?${messageQuery({ q, limit: q ? 500 : 200 })}`);
-  renderMessages(data.messages);
+  loadedMessages = data.messages;
+  hasOlderMessages = data.messages.length >= (q ? 500 : 200);
+  lastMessageQuery = q;
+  renderMessages(loadedMessages);
   els.feed.scrollTop = q ? 0 : scrollTop;
+}
+
+async function loadOlderMessages() {
+  if (!loadedMessages.length || !hasOlderMessages) return;
+  const q = els.searchInput.value.trim();
+  if (q || q !== lastMessageQuery) return;
+
+  els.loadOlderBtn.disabled = true;
+  els.loadOlderBtn.textContent = "加载中...";
+  const previousHeight = els.feed.scrollHeight;
+  try {
+    const before = loadedMessages[0].sentAt;
+    const data = await api(`/api/messages?${messageQuery({ before, limit: 200 })}`);
+    hasOlderMessages = data.messages.length >= 200;
+    const seen = new Set(loadedMessages.map((message) => message.platformMessageId || `${message.sentAt}-${message.userId}-${message.content}`));
+    const older = data.messages.filter((message) => !seen.has(message.platformMessageId || `${message.sentAt}-${message.userId}-${message.content}`));
+    loadedMessages = [...older, ...loadedMessages];
+    renderMessages(loadedMessages);
+    els.feed.scrollTop += els.feed.scrollHeight - previousHeight;
+  } finally {
+    els.loadOlderBtn.disabled = false;
+    els.loadOlderBtn.textContent = "加载更早消息";
+  }
 }
 
 async function refreshAll() {
@@ -490,6 +521,7 @@ els.generateBtn.addEventListener("click", generateSummary);
 els.testPushBtn.addEventListener("click", () => pushSummary("test").catch(() => {}));
 els.officialPushBtn.addEventListener("click", () => pushSummary("official").catch(() => {}));
 els.syncHistoryBtn.addEventListener("click", syncHistory);
+els.loadOlderBtn.addEventListener("click", () => loadOlderMessages().catch(() => {}));
 els.generateDateInput.addEventListener("change", () => {
   if (!selectedReportDate) setSelectedReportDate("");
 });

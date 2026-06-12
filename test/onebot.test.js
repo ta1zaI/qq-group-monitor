@@ -174,6 +174,31 @@ test("queries summary messages by natural day", () => {
   assert.deepEqual(messages.map((message) => message.content), ["inside-a", "inside-b"]);
 });
 
+test("pages older stored messages by sent_at cursor", () => {
+  const db = openDatabase(process.cwd(), ":memory:");
+  for (const [index, sentAt] of [
+    "2026-06-10T01:00:00.000Z",
+    "2026-06-10T02:00:00.000Z",
+    "2026-06-10T03:00:00.000Z"
+  ].entries()) {
+    insertMessage(db, {
+      platformMessageId: `m-page-${index}`,
+      groupId: "g1",
+      userId: "u1",
+      nickname: "玩家A",
+      messageType: "text",
+      content: `msg-${index}`,
+      raw: {},
+      sentAt
+    });
+  }
+
+  const latest = listMessages(db, { groupId: "g1", limit: 2 });
+  assert.deepEqual(latest.map((message) => message.content), ["msg-1", "msg-2"]);
+  const older = listMessages(db, { groupId: "g1", before: latest[0].sentAt, limit: 2 });
+  assert.deepEqual(older.map((message) => message.content), ["msg-0"]);
+});
+
 test("returns image attachments from stored OneBot messages", () => {
   const db = openDatabase(process.cwd(), ":memory:");
   insertMessage(db, {

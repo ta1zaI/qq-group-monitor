@@ -188,6 +188,10 @@ function listMessages(db, filters = {}) {
     clauses.push("date(sent_at, 'localtime') = ?");
     params.push(filters.date);
   }
+  if (filters.before) {
+    clauses.push("sent_at < ?");
+    params.push(filters.before);
+  }
   if (filters.q) {
     clauses.push("(content LIKE ? OR nickname LIKE ? OR user_id LIKE ?)");
     const q = `%${filters.q}%`;

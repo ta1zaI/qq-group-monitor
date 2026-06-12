@@ -551,6 +551,7 @@ function createApp({ rootDir = ROOT, config: injectedConfig, db: injectedDb } = 
       json(res, 200, {
         messages: listMessages(db, {
           date: url.searchParams.get("date") || "",
+          before: url.searchParams.get("before") || "",
           groupId,
           q: url.searchParams.get("q") || "",
           limit: url.searchParams.get("limit") || 200
