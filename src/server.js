@@ -527,7 +527,6 @@ function createApp({ rootDir = ROOT, config: injectedConfig, db: injectedDb } = 
         window,
         groupMemberCount: await getGroupMemberCount(groupId),
         analysis: analyzeMessages(messages, config.summary?.keywords || []),
-        latestMessages: listMessages(db, { groupId, limit: 5000 }),
         summary: getSummary(db, window.date, groupId)
       });
       return;

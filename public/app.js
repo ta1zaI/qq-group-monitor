@@ -382,7 +382,7 @@ async function loadDashboard() {
 async function loadMessages() {
   const q = els.searchInput.value.trim();
   const scrollTop = els.feed.scrollTop;
-  const data = await api(`/api/messages?${messageQuery({ q, limit: 5000 })}`);
+  const data = await api(`/api/messages?${messageQuery({ q, limit: q ? 500 : 200 })}`);
   renderMessages(data.messages);
   els.feed.scrollTop = q ? 0 : scrollTop;
 }
