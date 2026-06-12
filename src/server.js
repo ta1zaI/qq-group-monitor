@@ -546,6 +546,12 @@ function createApp({ rootDir = ROOT, config: injectedConfig, db: injectedDb } = 
       return;
     }
 
+    if (req.method === "POST" && url.pathname === "/api/admin/verify") {
+      if (!requireAdmin(req, res, config)) return;
+      json(res, 200, { ok: true });
+      return;
+    }
+
     if (req.method === "GET" && url.pathname === "/api/messages") {
       const groupId = url.searchParams.get("group_id") || defaultGroupId(config);
       json(res, 200, {
@@ -690,6 +696,7 @@ function createApp({ rootDir = ROOT, config: injectedConfig, db: injectedDb } = 
 
   function scheduleDailySummary() {
     if (config.summary?.autoGenerate !== true) return;
+    const shouldAutoPush = config.summary?.autoPush === true;
     const [hh, mm] = String(config.summary.dailyTime || "10:00").split(":").map(Number);
     const now = new Date();
     const next = new Date();
@@ -702,11 +709,11 @@ function createApp({ rootDir = ROOT, config: injectedConfig, db: injectedDb } = 
       const groups = groupIdsForDay(db, reportDate).filter((groupId) => shouldAcceptGroup(config, groupId));
       if (!groups.length) {
         const summary = await generateAndSave(reportDate, defaultGroupId(config));
-        if (summary.status === "ok") await pushSummaryToFeishu(summary, summary.window, defaultGroupId(config), "official").catch(() => {});
+        if (shouldAutoPush && summary.status === "ok") await pushSummaryToFeishu(summary, summary.window, defaultGroupId(config), "official").catch(() => {});
       }
       for (const groupId of groups) {
         const summary = await generateAndSave(reportDate, groupId);
-        if (summary.status === "ok") await pushSummaryToFeishu(summary, summary.window, groupId, "official").catch(() => {});
+        if (shouldAutoPush && summary.status === "ok") await pushSummaryToFeishu(summary, summary.window, groupId, "official").catch(() => {});
       }
       scheduleDailySummary();
     }, next - now);

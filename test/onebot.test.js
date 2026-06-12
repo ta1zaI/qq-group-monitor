@@ -320,6 +320,23 @@ test("requires admin password for manual generation and push", async () => {
   });
   const server = await listen(app);
   try {
+    const verifyDenied = await request(server, {
+      method: "POST",
+      path: "/api/admin/verify",
+      headers: { "content-type": "application/json" },
+      body: {}
+    });
+    assert.equal(verifyDenied.status, 401);
+
+    const verified = await request(server, {
+      method: "POST",
+      path: "/api/admin/verify",
+      headers: { "content-type": "application/json", "x-admin-password": "20018001" },
+      body: {}
+    });
+    assert.equal(verified.status, 200);
+    assert.equal(verified.body.ok, true);
+
     const denied = await request(server, {
       method: "POST",
       path: "/api/summary/generate",
@@ -497,6 +514,94 @@ test("does not schedule automatic summary when disabled", () => {
     assert.equal(scheduled, false);
   } finally {
     globalThis.setTimeout = originalSetTimeout;
+  }
+});
+
+test("scheduled summary generation does not push when autoPush is disabled", async () => {
+  const originalSetTimeout = globalThis.setTimeout;
+  const originalFetch = globalThis.fetch;
+  const callbacks = [];
+  const fetchCalls = [];
+  globalThis.setTimeout = (callback) => {
+    callbacks.push(callback);
+    return callbacks.length;
+  };
+  globalThis.fetch = async (url, options) => {
+    fetchCalls.push({ url: String(url), options });
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({ code: 0, msg: "ok" })
+    };
+  };
+
+  try {
+    const db = openDatabase(process.cwd(), ":memory:");
+    const app = createApp({
+      db,
+      config: {
+        server: { host: "127.0.0.1", port: 0 },
+        admin: { password: "20018001" },
+        onebot: { wsUrl: "", accessToken: "", groupIds: ["g1"] },
+        feishu: { officialWebhookUrl: "https://open.feishu.cn/webhook/official", secret: "" },
+        model: { provider: "ollama", baseUrl: "http://127.0.0.1:11434", model: "qwen3:8b", apiKey: "" },
+        summary: { autoGenerate: true, autoPush: false, dailyTime: "00:05", keywords: [] }
+      }
+    });
+    app.scheduleDailySummary();
+    assert.equal(callbacks.length, 1);
+    await callbacks[0]();
+
+    assert.equal(listSummaries(db, "g1").length, 1);
+    assert.equal(fetchCalls.length, 0);
+  } finally {
+    globalThis.setTimeout = originalSetTimeout;
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("scheduled summary generation still pushes when autoPush is enabled", async () => {
+  const originalSetTimeout = globalThis.setTimeout;
+  const originalFetch = globalThis.fetch;
+  const callbacks = [];
+  const fetchCalls = [];
+  globalThis.setTimeout = (callback) => {
+    callbacks.push(callback);
+    return callbacks.length;
+  };
+  globalThis.fetch = async (url, options) => {
+    fetchCalls.push({ url: String(url), body: JSON.parse(options.body) });
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({ code: 0, msg: "ok" })
+    };
+  };
+
+  try {
+    const db = openDatabase(process.cwd(), ":memory:");
+    const app = createApp({
+      db,
+      config: {
+        server: { host: "127.0.0.1", port: 0 },
+        admin: { password: "20018001" },
+        onebot: { wsUrl: "", accessToken: "", groupIds: ["g1"] },
+        feishu: { officialWebhookUrl: "https://open.feishu.cn/webhook/official", secret: "" },
+        model: { provider: "ollama", baseUrl: "http://127.0.0.1:11434", model: "qwen3:8b", apiKey: "" },
+        summary: { autoGenerate: true, autoPush: true, dailyTime: "00:05", keywords: [] }
+      }
+    });
+    app.scheduleDailySummary();
+    assert.equal(callbacks.length, 1);
+    await callbacks[0]();
+
+    assert.equal(listSummaries(db, "g1").length, 1);
+    assert.equal(fetchCalls.length, 1);
+    assert.equal(fetchCalls[0].url, "https://open.feishu.cn/webhook/official");
+    assert.equal(fetchCalls[0].body.msg_type, "interactive");
+  } finally {
+    globalThis.setTimeout = originalSetTimeout;
+    globalThis.fetch = originalFetch;
   }
 });
 

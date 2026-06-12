@@ -321,7 +321,12 @@ button:disabled {
   width: 100%;
 }
 
+.admin-actions[hidden] {
+  display: none;
+}
+
 .action-card #adminPassword,
+.action-card #verifyAdminBtn,
 .action-card #testPushBtn,
 .action-card #officialPushBtn,
 .action-card #syncHistoryBtn {

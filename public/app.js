@@ -9,6 +9,8 @@ const els = {
   generateDateInput: document.querySelector("#generateDateInput"),
   searchInput: document.querySelector("#searchInput"),
   adminPassword: document.querySelector("#adminPassword"),
+  verifyAdminBtn: document.querySelector("#verifyAdminBtn"),
+  adminActions: document.querySelector("#adminActions"),
   generateBtn: document.querySelector("#generateBtn"),
   testPushBtn: document.querySelector("#testPushBtn"),
   officialPushBtn: document.querySelector("#officialPushBtn"),
@@ -37,6 +39,7 @@ let hasOlderMessages = true;
 let lastMessageQuery = "";
 let cachedReports = [];
 let summaryRequestId = 0;
+let adminVerified = false;
 
 function today() {
   const d = new Date();
@@ -107,6 +110,36 @@ function setActionBusy(busy) {
   els.officialPushBtn.disabled = busy;
   els.syncHistoryBtn.disabled = busy;
   els.generateDateInput.disabled = busy;
+  els.verifyAdminBtn.disabled = busy;
+}
+
+function setAdminVerified(verified) {
+  adminVerified = verified;
+  els.adminActions.hidden = !verified;
+  els.verifyAdminBtn.hidden = verified;
+  if (!verified) {
+    setActionBusy(false);
+  }
+}
+
+async function verifyAdmin() {
+  saveAdminPassword();
+  setAdminVerified(false);
+  els.verifyAdminBtn.disabled = true;
+  setProgress(35, "正在验证管理员密码...");
+  try {
+    await api("/api/admin/verify", {
+      method: "POST",
+      headers: adminHeaders(),
+      body: JSON.stringify({})
+    });
+    setAdminVerified(true);
+    setProgress(100, "管理员已验证", "ok");
+  } catch (error) {
+    setProgress(100, error.message, "error");
+  } finally {
+    if (!adminVerified) els.verifyAdminBtn.disabled = false;
+  }
 }
 
 const SUMMARY_SECTIONS = new Set([
@@ -550,7 +583,10 @@ function connectEvents() {
 els.generateDateInput.value = today();
 setSelectedReportDate("");
 els.adminPassword.value = localStorage.getItem("qq-monitor-admin-password") || "";
+setAdminVerified(false);
 els.refreshBtn.addEventListener("click", refreshAll);
+els.verifyAdminBtn.addEventListener("click", () => verifyAdmin().catch(() => {}));
+els.adminPassword.addEventListener("input", () => setAdminVerified(false));
 els.generateBtn.addEventListener("click", generateSummary);
 els.testPushBtn.addEventListener("click", () => pushSummary("test").catch(() => {}));
 els.officialPushBtn.addEventListener("click", () => pushSummary("official").catch(() => {}));
