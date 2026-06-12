@@ -5,7 +5,8 @@ const els = {
   onebotState: document.querySelector("#onebotState"),
   modelState: document.querySelector("#modelState"),
   refreshBtn: document.querySelector("#refreshBtn"),
-  dateInput: document.querySelector("#dateInput"),
+  reportDateState: document.querySelector("#reportDateState"),
+  generateDateInput: document.querySelector("#generateDateInput"),
   searchInput: document.querySelector("#searchInput"),
   adminPassword: document.querySelector("#adminPassword"),
   generateBtn: document.querySelector("#generateBtn"),
@@ -29,6 +30,8 @@ const els = {
   imageModalImg: document.querySelector("#imageModalImg")
 };
 
+let selectedReportDate = "";
+
 function today() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -36,10 +39,19 @@ function today() {
 
 function query(extra = {}) {
   return new URLSearchParams({
-    date: els.dateInput.value || today(),
+    date: currentReportDate(),
     group_id: GROUP_ID,
     ...extra
   }).toString();
+}
+
+function currentReportDate() {
+  return selectedReportDate || els.generateDateInput.value || today();
+}
+
+function setSelectedReportDate(date) {
+  selectedReportDate = date || "";
+  els.reportDateState.textContent = `当前日报：${currentReportDate()}`;
 }
 
 function messageQuery(extra = {}) {
@@ -83,6 +95,7 @@ function setActionBusy(busy) {
   els.testPushBtn.disabled = busy;
   els.officialPushBtn.disabled = busy;
   els.syncHistoryBtn.disabled = busy;
+  els.generateDateInput.disabled = busy;
 }
 
 const SUMMARY_SECTIONS = new Set([
@@ -265,7 +278,7 @@ function renderReports(reports) {
   for (const report of reports) {
     const button = document.createElement("button");
     button.type = "button";
-    button.className = report.summaryDate === els.dateInput.value ? "report-item active" : "report-item";
+    button.className = report.summaryDate === currentReportDate() ? "report-item active" : "report-item";
 
     const date = document.createElement("span");
     date.textContent = report.summaryDate;
@@ -274,7 +287,7 @@ function renderReports(reports) {
 
     button.append(date, status);
     button.addEventListener("click", () => {
-      els.dateInput.value = report.summaryDate;
+      setSelectedReportDate(report.summaryDate);
       refreshReportView();
     });
     els.reportList.appendChild(button);
@@ -352,6 +365,7 @@ async function loadHealth() {
 
 async function loadReports() {
   const data = await api(`/api/reports?group_id=${GROUP_ID}&limit=120`);
+  if (!selectedReportDate && data.reports?.length) setSelectedReportDate(data.reports[0].summaryDate);
   renderReports(data.reports);
 }
 
@@ -374,18 +388,21 @@ async function loadMessages() {
 }
 
 async function refreshAll() {
-  await Promise.all([loadHealth(), loadReports(), loadDashboard(), loadMessages()]);
+  await Promise.all([loadHealth(), loadReports()]);
+  await Promise.all([loadDashboard(), loadMessages()]);
 }
 
 async function refreshReportView() {
-  await Promise.all([loadHealth(), loadReports(), loadDashboard()]);
+  await Promise.all([loadHealth(), loadReports()]);
+  await loadDashboard();
 }
 
 async function generateSummary() {
   saveAdminPassword();
+  const date = els.generateDateInput.value || today();
   setActionBusy(true);
   els.generateBtn.textContent = "生成中...";
-  setProgress(12, "校验权限...");
+  setProgress(12, `校验权限：${date}`);
   const timers = [];
   try {
     timers.push(setTimeout(() => setProgress(32, "读取消息..."), 150));
@@ -393,10 +410,11 @@ async function generateSummary() {
     const data = await api("/api/summary/generate", {
       method: "POST",
       headers: adminHeaders(),
-      body: JSON.stringify({ date: els.dateInput.value || today(), groupId: GROUP_ID })
+      body: JSON.stringify({ date, groupId: GROUP_ID })
     });
     setProgress(84, "保存日报...");
     renderSummary(data.summary);
+    setSelectedReportDate(data.summary?.summaryDate || date);
     await refreshReportView();
     setProgress(100, "完成", "ok");
   } catch (error) {
@@ -410,17 +428,18 @@ async function generateSummary() {
 
 async function pushSummary(target) {
   saveAdminPassword();
+  const date = currentReportDate();
   setActionBusy(true);
   const button = target === "official" ? els.officialPushBtn : els.testPushBtn;
   const idleText = target === "official" ? "正式推送" : "测试推送";
   button.textContent = "推送中...";
-  setProgress(20, "校验权限...");
+  setProgress(20, `校验权限：${date}`);
   try {
     setProgress(55, target === "official" ? "正式推送到飞书..." : "测试推送到飞书...");
     await api("/api/summary/push", {
       method: "POST",
       headers: adminHeaders(),
-      body: JSON.stringify({ date: els.dateInput.value || today(), groupId: GROUP_ID, target })
+      body: JSON.stringify({ date, groupId: GROUP_ID, target })
     });
     setProgress(100, target === "official" ? "已正式推送到飞书" : "已测试推送到飞书", "ok");
   } catch (error) {
@@ -463,14 +482,17 @@ function connectEvents() {
   events.addEventListener("summary", () => refreshReportView());
 }
 
-els.dateInput.value = today();
+els.generateDateInput.value = today();
+setSelectedReportDate("");
 els.adminPassword.value = localStorage.getItem("qq-monitor-admin-password") || "";
 els.refreshBtn.addEventListener("click", refreshAll);
 els.generateBtn.addEventListener("click", generateSummary);
 els.testPushBtn.addEventListener("click", () => pushSummary("test").catch(() => {}));
 els.officialPushBtn.addEventListener("click", () => pushSummary("official").catch(() => {}));
 els.syncHistoryBtn.addEventListener("click", syncHistory);
-els.dateInput.addEventListener("change", refreshReportView);
+els.generateDateInput.addEventListener("change", () => {
+  if (!selectedReportDate) setSelectedReportDate("");
+});
 els.searchInput.addEventListener("input", () => setTimeout(loadMessages, 100));
 els.imageModalClose.addEventListener("click", closeImageModal);
 els.imageModal.addEventListener("click", (event) => {

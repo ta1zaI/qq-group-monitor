@@ -321,7 +321,9 @@ button:disabled {
   width: 100%;
 }
 
-.action-card #pushBtn,
+.action-card #adminPassword,
+.action-card #testPushBtn,
+.action-card #officialPushBtn,
 .action-card #syncHistoryBtn {
   margin-top: 10px;
 }

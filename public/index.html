@@ -71,10 +71,10 @@
         <header class="stage-toolbar">
           <div>
             <h2>《全植英雄》官方群日报</h2>
+            <p id="reportDateState">当前日报：--</p>
             <p id="status">正在连接本地服务...</p>
           </div>
           <div class="toolbar-actions">
-            <input id="dateInput" type="date" />
             <input id="searchInput" placeholder="搜索玩家、消息或关键词" />
             <button id="refreshBtn" type="button">刷新</button>
           </div>
@@ -107,6 +107,7 @@
         <section class="action-card">
           <h2>日报生成</h2>
           <p>每日 00:05 自动生成前一日 QQ 群日报；管理员也可手动生成所选自然日。</p>
+          <input id="generateDateInput" type="date" aria-label="生成日期" />
           <input id="adminPassword" type="password" placeholder="管理员密码" autocomplete="current-password" />
           <button id="generateBtn" type="button" class="primary-action">生成日报</button>
           <button id="testPushBtn" type="button">测试推送</button>
