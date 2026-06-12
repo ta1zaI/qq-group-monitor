@@ -321,7 +321,7 @@ button:disabled {
   width: 100%;
 }
 
-.admin-actions[hidden] {
+.admin-actions.is-hidden {
   display: none;
 }
 
@@ -471,7 +471,7 @@ button:disabled {
 
 .load-older-btn {
   width: calc(100% - 32px);
-  margin: 0 16px 14px;
+  margin: 12px 16px 0;
   flex: none;
 }
 

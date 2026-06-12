@@ -98,8 +98,8 @@
                 <p id="messageCount">0 条</p>
               </div>
             </div>
-            <div id="feed" class="message-feed"></div>
             <button id="loadOlderBtn" type="button" class="load-older-btn">加载更早消息</button>
+            <div id="feed" class="message-feed"></div>
           </section>
         </div>
       </section>
@@ -110,7 +110,7 @@
           <p>定时生成已保留，定时推送已关闭；输入管理员密码后可手动生成或推送。</p>
           <input id="generateDateInput" type="date" aria-label="生成日期" />
           <input id="adminPassword" type="password" placeholder="管理员密码" autocomplete="current-password" />
-          <div id="adminActions" class="admin-actions" hidden>
+          <div id="adminActions" class="admin-actions">
             <button id="generateBtn" type="button" class="primary-action">生成日报</button>
             <button id="testPushBtn" type="button">测试推送</button>
             <button id="officialPushBtn" type="button">正式推送</button>

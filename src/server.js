@@ -529,6 +529,7 @@ function createApp({ rootDir = ROOT, config: injectedConfig, db: injectedDb } = 
       res.writeHead(200, {
         "content-type": "text/event-stream; charset=utf-8",
         "cache-control": "no-cache",
+        "x-accel-buffering": "no",
         connection: "keep-alive"
       });
       res.write("event: ready\ndata: {}\n\n");

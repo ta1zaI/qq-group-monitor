@@ -38,6 +38,7 @@ let hasOlderMessages = true;
 let lastMessageQuery = "";
 let cachedReports = [];
 let summaryRequestId = 0;
+let loadingMessages = false;
 
 function today() {
   const d = new Date();
@@ -111,7 +112,7 @@ function setActionBusy(busy) {
 }
 
 function updateAdminActionsVisibility() {
-  els.adminActions.hidden = !els.adminPassword.value.trim();
+  els.adminActions.classList.toggle("is-hidden", !els.adminPassword.value.trim());
 }
 
 function handleAdminPasswordInput() {
@@ -428,15 +429,32 @@ async function loadSummary() {
   renderSummary(data.summary);
 }
 
-async function loadMessages() {
+function isFeedNearBottom() {
+  return els.feed.scrollHeight - els.feed.scrollTop - els.feed.clientHeight < 80;
+}
+
+async function loadMessages({ stickToBottom = false } = {}) {
+  if (loadingMessages) return;
+  loadingMessages = true;
   const q = els.searchInput.value.trim();
   const scrollTop = els.feed.scrollTop;
-  const data = await api(`/api/messages?${messageQuery({ q, limit: q ? 500 : 200 })}`);
-  loadedMessages = data.messages;
-  hasOlderMessages = data.messages.length >= (q ? 500 : 200);
-  lastMessageQuery = q;
-  renderMessages(loadedMessages);
-  els.feed.scrollTop = q ? 0 : scrollTop;
+  const wasNearBottom = isFeedNearBottom();
+  try {
+    const data = await api(`/api/messages?${messageQuery({ q, limit: q ? 500 : 200 })}`);
+    loadedMessages = data.messages;
+    hasOlderMessages = data.messages.length >= (q ? 500 : 200);
+    lastMessageQuery = q;
+    renderMessages(loadedMessages);
+    if (q) {
+      els.feed.scrollTop = 0;
+    } else if (stickToBottom && wasNearBottom) {
+      els.feed.scrollTop = els.feed.scrollHeight;
+    } else {
+      els.feed.scrollTop = scrollTop;
+    }
+  } finally {
+    loadingMessages = false;
+  }
 }
 
 async function loadOlderMessages() {
@@ -552,9 +570,12 @@ function connectEvents() {
   const events = new EventSource("/api/events");
   events.addEventListener("message", () => {
     loadDashboard();
-    loadMessages();
+    loadMessages({ stickToBottom: true });
   });
   events.addEventListener("summary", () => refreshReportView());
+  events.addEventListener("error", () => {
+    loadHealth().catch(() => {});
+  });
 }
 
 els.generateDateInput.value = today();
@@ -572,6 +593,12 @@ els.generateDateInput.addEventListener("change", () => {
   if (!selectedReportDate) setSelectedReportDate("");
 });
 els.searchInput.addEventListener("input", () => setTimeout(loadMessages, 100));
+setInterval(() => {
+  if (document.hidden) return;
+  loadHealth().catch(() => {});
+  loadDashboard().catch(() => {});
+  loadMessages({ stickToBottom: true }).catch(() => {});
+}, 10000);
 els.imageModalClose.addEventListener("click", closeImageModal);
 els.imageModal.addEventListener("click", (event) => {
   if (event.target === els.imageModal) closeImageModal();
