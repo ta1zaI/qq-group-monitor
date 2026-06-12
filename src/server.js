@@ -359,18 +359,73 @@ function createApp({ rootDir = ROOT, config: injectedConfig, db: injectedDb } = 
     return { target: normalized, webhookUrl };
   }
 
+  function formatFeishuLine(line) {
+    const text = String(line || "").trim().replace(/\*\*/g, "");
+    if (!text) return "";
+    const match = text.match(/^([^：:]{2,24})([：:])(.+)$/);
+    if (match) return `- **${match[1]}**：${match[3].trim()}`;
+    return text;
+  }
+
+  function buildFeishuCard(summary, window) {
+    const lines = String(summary.content || "").split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+    const titlePattern = /^(?:QQ群玩家日报：?.*|一句话总结|代表性发言 \/ 玩家反馈|全群问题 \/ 风险|舆论|平衡性 \/ 夸大与失真|建议关注动作)$/;
+    const elements = [];
+    let currentTitle = "";
+    let currentLines = [];
+
+    const flush = () => {
+      if (!currentTitle && !currentLines.length) return;
+      const content = [
+        currentTitle ? `**${currentTitle}**` : "",
+        ...currentLines.map(formatFeishuLine).filter(Boolean)
+      ].filter(Boolean).join("\n");
+      if (content) {
+        elements.push({
+          tag: "div",
+          text: { tag: "lark_md", content }
+        });
+      }
+      currentTitle = "";
+      currentLines = [];
+    };
+
+    for (const line of lines) {
+      if (titlePattern.test(line)) {
+        flush();
+        if (!line.startsWith("QQ群玩家日报")) currentTitle = line;
+        continue;
+      }
+      currentLines.push(line);
+    }
+    flush();
+
+    if (!elements.length) {
+      elements.push({
+        tag: "div",
+        text: { tag: "lark_md", content: summary.content || "暂无日报内容" }
+      });
+    }
+
+    return {
+      config: { wide_screen_mode: true },
+      header: {
+        template: "blue",
+        title: {
+          tag: "plain_text",
+          content: `《全植英雄》官方群日报 | ${window.label}`
+        }
+      },
+      elements: elements.slice(0, 18)
+    };
+  }
+
   async function pushSummaryToFeishu(summary, window, groupId, target = "test") {
     const { webhookUrl } = feishuWebhookForTarget(target);
 
-    const text = [
-      "《全植英雄》官方群日报",
-      `日期：${window.label}`,
-      "",
-      summary.content || ""
-    ].join("\n");
     const payload = {
-      msg_type: "text",
-      content: { text }
+      msg_type: "interactive",
+      card: buildFeishuCard(summary, window)
     };
 
     if (config.feishu?.secret) {

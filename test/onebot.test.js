@@ -358,9 +358,12 @@ test("pushes saved summary to configured Feishu webhook", async () => {
     });
     assert.equal(pushed.status, 200);
     assert.equal(calls.length, 1);
-    assert.equal(calls[0].body.msg_type, "text");
-    assert.match(calls[0].body.content.text, /日期：2026-06-10/);
-    assert.match(calls[0].body.content.text, /日报正文/);
+    assert.equal(calls[0].body.msg_type, "interactive");
+    assert.equal(calls[0].body.card.header.title.content, "《全植英雄》官方群日报 | 2026-06-10");
+    assert.ok(calls[0].body.card.elements.length >= 1);
+    assert.equal(calls[0].body.card.elements[0].tag, "div");
+    assert.equal(calls[0].body.card.elements[0].text.tag, "lark_md");
+    assert.match(calls[0].body.card.elements[0].text.content, /日报正文/);
   } finally {
     globalThis.fetch = originalFetch;
     server.close();
@@ -408,6 +411,7 @@ test("pushes saved summary to official Feishu webhook when requested", async () 
     assert.equal(pushed.body.target, "official");
     assert.equal(calls.length, 1);
     assert.equal(calls[0].url, "https://open.feishu.cn/webhook/official");
+    assert.equal(calls[0].body.msg_type, "interactive");
   } finally {
     globalThis.fetch = originalFetch;
     server.close();
