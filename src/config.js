@@ -13,6 +13,7 @@ const DEFAULT_CONFIG = {
     apiKey: ""
   },
   summary: {
+    autoGenerate: false,
     dailyTime: "10:00",
     keywords: ["bug", "卡", "外挂", "退款", "充值", "掉线", "封号", "活动"]
   }

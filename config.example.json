@@ -24,6 +24,7 @@
     "secret": ""
   },
   "summary": {
+    "autoGenerate": false,
     "dailyTime": "00:05",
     "timezone": "Asia/Shanghai",
     "keywords": ["bug", "卡", "外挂", "退款", "充值", "掉线", "封号", "活动", "VPN", "匹配", "下载", "更新"]

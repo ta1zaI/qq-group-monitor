@@ -472,6 +472,34 @@ test("returns readable error when Feishu webhook is missing", async () => {
   }
 });
 
+test("does not schedule automatic summary when disabled", () => {
+  const originalSetTimeout = globalThis.setTimeout;
+  let scheduled = false;
+  globalThis.setTimeout = () => {
+    scheduled = true;
+    return 1;
+  };
+
+  try {
+    const db = openDatabase(process.cwd(), ":memory:");
+    const app = createApp({
+      db,
+      config: {
+        server: { host: "127.0.0.1", port: 0 },
+        admin: { password: "20018001" },
+        onebot: { wsUrl: "", accessToken: "", groupIds: ["g1"] },
+        feishu: { webhookUrl: "", secret: "" },
+        model: { provider: "ollama", baseUrl: "http://127.0.0.1:11434", model: "qwen3:8b", apiKey: "" },
+        summary: { autoGenerate: false, dailyTime: "00:05", keywords: [] }
+      }
+    });
+    app.scheduleDailySummary();
+    assert.equal(scheduled, false);
+  } finally {
+    globalThis.setTimeout = originalSetTimeout;
+  }
+});
+
 test("dashboard reads group member count from OneBot", async () => {
   const originalWebSocket = globalThis.WebSocket;
   class FakeWebSocket {

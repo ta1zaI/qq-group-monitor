@@ -689,6 +689,7 @@ function createApp({ rootDir = ROOT, config: injectedConfig, db: injectedDb } = 
   }
 
   function scheduleDailySummary() {
+    if (config.summary?.autoGenerate !== true) return;
     const [hh, mm] = String(config.summary.dailyTime || "10:00").split(":").map(Number);
     const now = new Date();
     const next = new Date();
