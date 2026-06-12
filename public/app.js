@@ -460,7 +460,6 @@ async function refreshAll() {
 async function refreshReportView() {
   setReportLoading();
   await loadSummary();
-  loadDashboard().catch(() => {});
 }
 
 async function generateSummary() {
