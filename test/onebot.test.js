@@ -659,3 +659,74 @@ test("dashboard reads group member count from OneBot", async () => {
     server.close();
   }
 });
+
+test("sync history fetches multiple OneBot pages", async () => {
+  const originalWebSocket = globalThis.WebSocket;
+  const sentParams = [];
+  class FakeWebSocket {
+    static OPEN = 1;
+
+    constructor() {
+      this.readyState = FakeWebSocket.OPEN;
+      this.listeners = {};
+      setTimeout(() => this.listeners.open?.({}), 0);
+    }
+
+    addEventListener(event, listener) {
+      this.listeners[event] = listener;
+    }
+
+    send(text) {
+      const payload = JSON.parse(text);
+      sentParams.push(payload.params);
+      const start = payload.params.message_seq ? 1000 : 2000;
+      const size = payload.params.message_seq ? 1 : 1000;
+      const messages = Array.from({ length: size }, (_, index) => {
+        const id = start - index;
+        return {
+          post_type: "message",
+          message_type: "group",
+          message_id: id,
+          message_seq: id,
+          group_id: 10001,
+          user_id: 20002,
+          time: id,
+          sender: { nickname: "玩家A" },
+          message: [{ type: "text", data: { text: `消息 ${id}` } }]
+        };
+      });
+      setTimeout(() => {
+        this.listeners.message?.({
+          data: JSON.stringify({ echo: payload.echo, status: "ok", data: { messages } })
+        });
+      }, 0);
+    }
+  }
+  globalThis.WebSocket = FakeWebSocket;
+
+  try {
+    const db = openDatabase(process.cwd(), ":memory:");
+    const app = createApp({
+      db,
+      config: {
+        server: { host: "127.0.0.1", port: 0 },
+        admin: { password: "20018001" },
+        onebot: { wsUrl: "ws://127.0.0.1:3001", accessToken: "", groupIds: ["10001"] },
+        feishu: { webhookUrl: "", secret: "" },
+        model: { provider: "ollama", baseUrl: "http://127.0.0.1:11434", model: "qwen3:8b", apiKey: "" },
+        summary: { dailyTime: "10:00", keywords: [] }
+      }
+    });
+    app.connectOneBot();
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    const result = await app.syncGroupHistory("10001", 1001);
+    assert.equal(result.fetched, 1001);
+    assert.equal(result.inserted, 1001);
+    assert.equal(sentParams.length, 2);
+    assert.equal(sentParams[1].message_seq, 1001);
+    assert.equal(listMessages(db, { groupId: "10001", limit: 5000 }).length, 1001);
+  } finally {
+    globalThis.WebSocket = originalWebSocket;
+  }
+});

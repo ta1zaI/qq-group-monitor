@@ -9,7 +9,6 @@ const els = {
   generateDateInput: document.querySelector("#generateDateInput"),
   searchInput: document.querySelector("#searchInput"),
   adminPassword: document.querySelector("#adminPassword"),
-  verifyAdminBtn: document.querySelector("#verifyAdminBtn"),
   adminActions: document.querySelector("#adminActions"),
   generateBtn: document.querySelector("#generateBtn"),
   testPushBtn: document.querySelector("#testPushBtn"),
@@ -39,7 +38,6 @@ let hasOlderMessages = true;
 let lastMessageQuery = "";
 let cachedReports = [];
 let summaryRequestId = 0;
-let adminVerified = false;
 
 function today() {
   const d = new Date();
@@ -110,36 +108,15 @@ function setActionBusy(busy) {
   els.officialPushBtn.disabled = busy;
   els.syncHistoryBtn.disabled = busy;
   els.generateDateInput.disabled = busy;
-  els.verifyAdminBtn.disabled = busy;
 }
 
-function setAdminVerified(verified) {
-  adminVerified = verified;
-  els.adminActions.hidden = !verified;
-  els.verifyAdminBtn.hidden = verified;
-  if (!verified) {
-    setActionBusy(false);
-  }
+function updateAdminActionsVisibility() {
+  els.adminActions.hidden = !els.adminPassword.value.trim();
 }
 
-async function verifyAdmin() {
+function handleAdminPasswordInput() {
   saveAdminPassword();
-  setAdminVerified(false);
-  els.verifyAdminBtn.disabled = true;
-  setProgress(35, "正在验证管理员密码...");
-  try {
-    await api("/api/admin/verify", {
-      method: "POST",
-      headers: adminHeaders(),
-      body: JSON.stringify({})
-    });
-    setAdminVerified(true);
-    setProgress(100, "管理员已验证", "ok");
-  } catch (error) {
-    setProgress(100, error.message, "error");
-  } finally {
-    if (!adminVerified) els.verifyAdminBtn.disabled = false;
-  }
+  updateAdminActionsVisibility();
 }
 
 const SUMMARY_SECTIONS = new Set([
@@ -559,7 +536,7 @@ async function syncHistory() {
     const data = await api("/api/messages/sync-history", {
       method: "POST",
       headers: adminHeaders(),
-      body: JSON.stringify({ groupId: GROUP_ID, count: 1000 })
+      body: JSON.stringify({ groupId: GROUP_ID, count: 5000 })
     });
     await refreshAll();
     setProgress(100, `已同步 ${data.inserted} 条，读取 ${data.fetched} 条`, "ok");
@@ -583,10 +560,9 @@ function connectEvents() {
 els.generateDateInput.value = today();
 setSelectedReportDate("");
 els.adminPassword.value = localStorage.getItem("qq-monitor-admin-password") || "";
-setAdminVerified(false);
+updateAdminActionsVisibility();
 els.refreshBtn.addEventListener("click", refreshAll);
-els.verifyAdminBtn.addEventListener("click", () => verifyAdmin().catch(() => {}));
-els.adminPassword.addEventListener("input", () => setAdminVerified(false));
+els.adminPassword.addEventListener("input", handleAdminPasswordInput);
 els.generateBtn.addEventListener("click", generateSummary);
 els.testPushBtn.addEventListener("click", () => pushSummary("test").catch(() => {}));
 els.officialPushBtn.addEventListener("click", () => pushSummary("official").catch(() => {}));

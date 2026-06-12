@@ -474,11 +474,41 @@ function createApp({ rootDir = ROOT, config: injectedConfig, db: injectedDb } = 
 
   async function syncGroupHistory(groupId = defaultGroupId(config), count = 1000) {
     const targetGroupId = String(groupId || defaultGroupId(config));
-    const response = await sendOneBotAction("get_group_msg_history", {
-      group_id: Number(targetGroupId),
-      count: Math.min(Number(count) || 1000, 1000)
-    }, 15000);
-    const messages = response?.data?.messages || [];
+    const targetCount = Math.min(Math.max(Number(count) || 1000, 1), 10000);
+    const pageSize = Math.min(targetCount, 1000);
+    const messages = [];
+    const seen = new Set();
+    let cursor = null;
+
+    while (messages.length < targetCount) {
+      const params = {
+        group_id: Number(targetGroupId),
+        count: Math.min(pageSize, targetCount - messages.length)
+      };
+      if (cursor) params.message_seq = cursor;
+      const response = await sendOneBotAction("get_group_msg_history", params, 20000);
+      const page = response?.data?.messages || [];
+      if (!page.length) break;
+
+      let added = 0;
+      for (const event of page) {
+        const id = String(event.message_id ?? `${event.time}-${event.user_id}-${JSON.stringify(event.message || "")}`);
+        if (seen.has(id)) continue;
+        seen.add(id);
+        messages.push(event);
+        added += 1;
+      }
+
+      const oldest = page.reduce((current, event) => {
+        const currentTime = Number(current?.time ?? 0);
+        const eventTime = Number(event?.time ?? 0);
+        return !current || eventTime < currentTime ? event : current;
+      }, null);
+      const nextCursor = Number(oldest?.message_seq ?? oldest?.message_id);
+      if (!added || page.length < pageSize || !Number.isFinite(nextCursor) || nextCursor === cursor) break;
+      cursor = nextCursor;
+    }
+
     let inserted = 0;
     for (const event of messages) {
       const msg = normalizeOneBotEvent(event);
