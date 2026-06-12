@@ -180,10 +180,26 @@ function renderReportContent(text) {
       continue;
     }
 
+    const titledItem = line.match(/^([^：:]{2,24})([：:])(.+)$/);
+    if (titledItem) {
+      if (!list) {
+        list = document.createElement("ul");
+        list.className = "report-bullets";
+        els.summaryBox.appendChild(list);
+      }
+      const item = document.createElement("li");
+      const strong = document.createElement("strong");
+      strong.textContent = `${titledItem[1]}${titledItem[2]}`;
+      item.append(strong, document.createTextNode(titledItem[3]));
+      list.appendChild(item);
+      continue;
+    }
+
     const listItem = line.match(/^(?:[-*]|\d+[.)、])\s*(.+)$/);
     if (listItem) {
       if (!list) {
-        list = document.createElement("ol");
+        list = document.createElement("ul");
+        list.className = "report-bullets";
         els.summaryBox.appendChild(list);
       }
       const item = document.createElement("li");

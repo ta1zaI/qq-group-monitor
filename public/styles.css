@@ -426,13 +426,29 @@ button:disabled {
   margin: 0 0 10px;
 }
 
-.report-content ol {
+.report-content ol,
+.report-content ul {
   margin: 0 0 12px;
-  padding-left: 24px;
+  padding-left: 0;
+  list-style: none;
 }
 
 .report-content li {
+  position: relative;
   margin: 0 0 8px;
+  padding-left: 18px;
+  line-height: 1.72;
+}
+
+.report-content li::before {
+  content: "";
+  position: absolute;
+  left: 2px;
+  top: 0.78em;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--accent-2);
 }
 
 .report-content strong {

@@ -363,7 +363,7 @@ function createApp({ rootDir = ROOT, config: injectedConfig, db: injectedDb } = 
     const text = String(line || "").trim().replace(/\*\*/g, "");
     if (!text) return "";
     const match = text.match(/^([^：:]{2,24})([：:])(.+)$/);
-    if (match) return `- **${match[1]}**：${match[3].trim()}`;
+    if (match) return `• **${match[1]}**：${match[3].trim()}`;
     return text;
   }
 
