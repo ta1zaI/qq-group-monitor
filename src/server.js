@@ -355,7 +355,7 @@ function createApp({ rootDir = ROOT, config: injectedConfig, db: injectedDb } = 
     if (!webhookUrl) throw new Error("未配置飞书机器人 webhookUrl");
 
     const text = [
-      `QQ群日报 #${groupId}`,
+      "《全植英雄》官方群日报",
       `日期：${window.label}`,
       "",
       summary.content || ""
