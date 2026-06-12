@@ -76,7 +76,16 @@ function messageQuery(extra = {}) {
 
 async function api(path, options) {
   const response = await fetch(path, options);
-  const data = await response.json();
+  const text = await response.text();
+  let data = {};
+  try {
+    data = text ? JSON.parse(text) : {};
+  } catch {
+    const hint = text.trim().startsWith("<!DOCTYPE") || text.trim().startsWith("<html")
+      ? "接口返回了网页内容，请确认服务器已 git pull 并重启，随后强刷页面。"
+      : "接口返回了无法识别的内容。";
+    throw new Error(hint);
+  }
   if (!response.ok && !data.summary) throw new Error(data.error || "请求失败");
   return data;
 }
