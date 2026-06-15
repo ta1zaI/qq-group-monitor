@@ -336,6 +336,7 @@ function renderReports(reports) {
     button.append(date, status);
     button.addEventListener("click", () => {
       setSelectedReportDate(report.summaryDate);
+      els.generateDateInput.value = report.summaryDate;
       renderReports(cachedReports);
       refreshReportView();
     });
@@ -555,7 +556,7 @@ async function pushSummary(target) {
 
 async function syncHistory() {
   saveAdminPassword();
-  const untilDate = currentReportDate();
+  const untilDate = els.generateDateInput.value || currentReportDate();
   setActionBusy(true);
   els.syncHistoryBtn.textContent = "同步中...";
   setProgress(20, `校验权限：回补到 ${untilDate}`);
@@ -601,7 +602,9 @@ els.officialPushBtn.addEventListener("click", () => pushSummary("official").catc
 els.syncHistoryBtn.addEventListener("click", syncHistory);
 els.loadOlderBtn.addEventListener("click", () => loadOlderMessages().catch(() => {}));
 els.generateDateInput.addEventListener("change", () => {
-  if (!selectedReportDate) setSelectedReportDate("");
+  setSelectedReportDate(els.generateDateInput.value || "");
+  renderReports(cachedReports);
+  refreshReportView();
 });
 els.searchInput.addEventListener("input", () => setTimeout(loadMessages, 100));
 setInterval(() => {
