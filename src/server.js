@@ -8,6 +8,7 @@ const {
   openDatabase,
   insertMessage,
   listMessages,
+  listMessagesPage,
   messagesForDay,
   countMessagesForDay,
   groupIdsForDay,
@@ -608,14 +609,16 @@ function createApp({ rootDir = ROOT, config: injectedConfig, db: injectedDb } = 
 
     if (req.method === "GET" && url.pathname === "/api/messages") {
       const groupId = url.searchParams.get("group_id") || defaultGroupId(config);
+      const page = listMessagesPage(db, {
+        date: url.searchParams.get("date") || "",
+        before: url.searchParams.get("before") || "",
+        groupId,
+        q: url.searchParams.get("q") || "",
+        limit: url.searchParams.get("limit") || 200
+      });
       json(res, 200, {
-        messages: listMessages(db, {
-          date: url.searchParams.get("date") || "",
-          before: url.searchParams.get("before") || "",
-          groupId,
-          q: url.searchParams.get("q") || "",
-          limit: url.searchParams.get("limit") || 200
-        })
+        messages: page.messages,
+        hasMore: page.hasMore
       });
       return;
     }

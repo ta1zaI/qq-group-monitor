@@ -195,6 +195,30 @@ function shouldHideMessage(message) {
   return !cleaned && !hasAttachments;
 }
 
+function visibleMessageSql() {
+  const cleaned = `
+    trim(
+      replace(
+        replace(
+          replace(
+            replace(
+              replace(
+                replace(content, '[face]', ''),
+                '[表情]', ''
+              ),
+              '[动画表情]', ''
+            ),
+            '[贴纸]', ''
+          ),
+          '[sticker]', ''
+        ),
+        '[emoji]', ''
+      )
+    )
+  `;
+  return `NOT (${cleaned} = '' AND raw_json NOT LIKE '%"type":"image"%')`;
+}
+
 function richParts(db, rawJson) {
   const segments = Array.isArray(rawJson?.message) ? rawJson.message : [];
   const parts = [];
@@ -249,8 +273,8 @@ function attachMessageExtras(db, row) {
   };
 }
 
-function listMessages(db, filters = {}) {
-  const clauses = [];
+function listMessagesPage(db, filters = {}) {
+  const clauses = [visibleMessageSql()];
   const params = [];
 
   if (filters.groupId) {
@@ -273,18 +297,27 @@ function listMessages(db, filters = {}) {
 
   const where = clauses.length ? `WHERE ${clauses.join(" AND ")}` : "";
   const limit = Math.min(Number(filters.limit) || 500, 5000);
-  return db.prepare(`
+  const fetchLimit = Math.min(limit + 1, 5000);
+  const rows = db.prepare(`
     SELECT id, platform_message_id AS platformMessageId, group_id AS groupId,
            user_id AS userId, nickname, message_type AS messageType,
            content, raw_json AS rawJson, sent_at AS sentAt, created_at AS createdAt
     FROM messages
     ${where}
     ORDER BY sent_at DESC, id DESC
-    LIMIT ${limit}
-  `).all(...params)
-    .reverse()
+    LIMIT ${fetchLimit}
+  `).all(...params);
+  const visible = rows
     .map((row) => attachMessageExtras(db, row))
     .filter((message) => !shouldHideMessage(message));
+  return {
+    messages: visible.slice(0, limit).reverse(),
+    hasMore: rows.length > limit
+  };
+}
+
+function listMessages(db, filters = {}) {
+  return listMessagesPage(db, filters).messages;
 }
 
 function messagesForDay(db, date, groupId = "") {
@@ -403,6 +436,7 @@ module.exports = {
   openDatabase,
   insertMessage,
   listMessages,
+  listMessagesPage,
   messagesForDay,
   countMessagesForDay,
   messagesForRange,

@@ -500,7 +500,7 @@ async function loadMessages({ stickToBottom = false, force = false } = {}) {
     const limit = q ? MESSAGE_SEARCH_LIMIT : MESSAGE_PAGE_SIZE;
     const data = await api(`/api/messages?${messageQuery({ q, limit })}`);
     loadedMessages = data.messages;
-    hasOlderMessages = data.messages.length >= limit && !q;
+    hasOlderMessages = Boolean(data.hasMore) && !q;
     lastMessageQuery = q;
     pendingMessageRefresh = false;
     renderMessages(loadedMessages);
@@ -527,7 +527,7 @@ async function loadOlderMessages() {
   try {
     const before = loadedMessages[0].sentAt;
     const data = await api(`/api/messages?${messageQuery({ before, limit: MESSAGE_PAGE_SIZE })}`);
-    hasOlderMessages = data.messages.length >= MESSAGE_PAGE_SIZE;
+    hasOlderMessages = Boolean(data.hasMore);
     const seen = new Set(loadedMessages.map((message) => message.platformMessageId || `${message.sentAt}-${message.userId}-${message.content}`));
     const older = data.messages.filter((message) => !seen.has(message.platformMessageId || `${message.sentAt}-${message.userId}-${message.content}`));
     loadedMessages = [...older, ...loadedMessages];

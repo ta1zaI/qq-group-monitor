@@ -2,7 +2,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const http = require("node:http");
 const { normalizeOneBotEvent, shouldAcceptGroup } = require("../src/onebot");
-const { openDatabase, insertMessage, listMessages, messagesForDay, saveSummary, listSummaries } = require("../src/db");
+const { openDatabase, insertMessage, listMessages, listMessagesPage, messagesForDay, saveSummary, listSummaries } = require("../src/db");
 const { importQceJson } = require("../src/qceImporter");
 const { dedupeMessages } = require("../src/dedupeMessages");
 const { localExtractiveSummary, analyzeMessages } = require("../src/summarizer");
@@ -208,6 +208,38 @@ test("pages older stored messages by sent_at cursor", () => {
   assert.deepEqual(latest.map((message) => message.content), ["msg-1", "msg-2"]);
   const older = listMessages(db, { groupId: "g1", before: latest[0].sentAt, limit: 2 });
   assert.deepEqual(older.map((message) => message.content), ["msg-0"]);
+});
+
+test("message pages return the requested number of visible rows and keep hasMore", () => {
+  const db = openDatabase(process.cwd(), ":memory:");
+  for (let index = 0; index < 105; index += 1) {
+    const sentAt = new Date(Date.UTC(2026, 5, 10, 0, 0, index)).toISOString();
+    insertMessage(db, {
+      platformMessageId: `visible-${index}`,
+      groupId: "g1",
+      userId: "u1",
+      nickname: "玩家A",
+      messageType: "text",
+      content: `visible-${index}`,
+      sentAt,
+      raw: {}
+    });
+  }
+  insertMessage(db, {
+    platformMessageId: "face-only-in-latest-page",
+    groupId: "g1",
+    userId: "u1",
+    nickname: "玩家A",
+    messageType: "face",
+    content: "[face][face]",
+    sentAt: "2026-06-10T01:59:00.000Z",
+    raw: {}
+  });
+
+  const page = listMessagesPage(db, { groupId: "g1", limit: 100 });
+  assert.equal(page.messages.length, 100);
+  assert.equal(page.hasMore, true);
+  assert(!page.messages.some((message) => message.platformMessageId === "face-only-in-latest-page"));
 });
 
 test("returns image attachments from stored OneBot messages", () => {
