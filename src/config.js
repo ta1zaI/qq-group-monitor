@@ -2,7 +2,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const DEFAULT_CONFIG = {
-  server: { host: "127.0.0.1", port: 8787 },
+  server: { host: "127.0.0.1", port: 8787, allowedHosts: [] },
   admin: { password: "20018001" },
   onebot: { wsUrl: "", accessToken: "", groupIds: [] },
   feishu: { webhookUrl: "", testWebhookUrl: "", officialWebhookUrl: "", secret: "" },

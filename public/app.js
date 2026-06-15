@@ -1,4 +1,7 @@
 const GROUP_ID = "816998268";
+const MESSAGE_PAGE_SIZE = 100;
+const MESSAGE_SEARCH_LIMIT = 1000;
+const FEED_INTERACTION_IDLE_MS = 1200;
 
 const els = {
   status: document.querySelector("#status"),
@@ -27,6 +30,7 @@ const els = {
   messageCount: document.querySelector("#messageCount"),
   feed: document.querySelector("#feed"),
   loadOlderBtn: document.querySelector("#loadOlderBtn"),
+  jumpBottomBtn: document.querySelector("#jumpBottomBtn"),
   imageModal: document.querySelector("#imageModal"),
   imageModalClose: document.querySelector("#imageModalClose"),
   imageModalImg: document.querySelector("#imageModalImg")
@@ -39,6 +43,9 @@ let lastMessageQuery = "";
 let cachedReports = [];
 let summaryRequestId = 0;
 let loadingMessages = false;
+let feedInteractionTimer = null;
+let feedInteractionActive = false;
+let pendingMessageRefresh = false;
 
 function today() {
   const d = new Date();
@@ -466,21 +473,40 @@ function isFeedNearBottom() {
   return els.feed.scrollHeight - els.feed.scrollTop - els.feed.clientHeight < 80;
 }
 
-async function loadMessages({ stickToBottom = false } = {}) {
+function markFeedInteraction() {
+  feedInteractionActive = true;
+  clearTimeout(feedInteractionTimer);
+  feedInteractionTimer = setTimeout(() => {
+    feedInteractionActive = false;
+  }, FEED_INTERACTION_IDLE_MS);
+}
+
+function shouldDeferMessageRefresh(force, q) {
+  return !force && !q && feedInteractionActive && !isFeedNearBottom();
+}
+
+async function loadMessages({ stickToBottom = false, force = false } = {}) {
   if (loadingMessages) return;
-  loadingMessages = true;
   const q = els.searchInput.value.trim();
+  if (shouldDeferMessageRefresh(force, q)) {
+    pendingMessageRefresh = true;
+    return;
+  }
+
+  loadingMessages = true;
   const scrollTop = els.feed.scrollTop;
   const wasNearBottom = isFeedNearBottom();
   try {
-    const data = await api(`/api/messages?${messageQuery({ q, limit: q ? 1000 : 1000 })}`);
+    const limit = q ? MESSAGE_SEARCH_LIMIT : MESSAGE_PAGE_SIZE;
+    const data = await api(`/api/messages?${messageQuery({ q, limit })}`);
     loadedMessages = data.messages;
-    hasOlderMessages = data.messages.length >= 1000;
+    hasOlderMessages = data.messages.length >= limit && !q;
     lastMessageQuery = q;
+    pendingMessageRefresh = false;
     renderMessages(loadedMessages);
     if (q) {
       els.feed.scrollTop = 0;
-    } else if (stickToBottom && wasNearBottom) {
+    } else if (stickToBottom && (wasNearBottom || force)) {
       els.feed.scrollTop = els.feed.scrollHeight;
     } else {
       els.feed.scrollTop = scrollTop;
@@ -500,8 +526,8 @@ async function loadOlderMessages() {
   const previousHeight = els.feed.scrollHeight;
   try {
     const before = loadedMessages[0].sentAt;
-    const data = await api(`/api/messages?${messageQuery({ before, limit: 1000 })}`);
-    hasOlderMessages = data.messages.length >= 1000;
+    const data = await api(`/api/messages?${messageQuery({ before, limit: MESSAGE_PAGE_SIZE })}`);
+    hasOlderMessages = data.messages.length >= MESSAGE_PAGE_SIZE;
     const seen = new Set(loadedMessages.map((message) => message.platformMessageId || `${message.sentAt}-${message.userId}-${message.content}`));
     const older = data.messages.filter((message) => !seen.has(message.platformMessageId || `${message.sentAt}-${message.userId}-${message.content}`));
     loadedMessages = [...older, ...loadedMessages];
@@ -511,6 +537,13 @@ async function loadOlderMessages() {
     els.loadOlderBtn.disabled = false;
     els.loadOlderBtn.textContent = "加载更早消息";
   }
+}
+
+async function jumpToMessageBottom() {
+  if (pendingMessageRefresh || !isFeedNearBottom()) {
+    await loadMessages({ stickToBottom: true, force: true });
+  }
+  els.feed.scrollTop = els.feed.scrollHeight;
 }
 
 async function refreshAll() {
@@ -625,12 +658,17 @@ els.testPushBtn.addEventListener("click", () => pushSummary("test").catch(() => 
 els.officialPushBtn.addEventListener("click", () => pushSummary("official").catch(() => {}));
 els.syncHistoryBtn.addEventListener("click", syncHistory);
 els.loadOlderBtn.addEventListener("click", () => loadOlderMessages().catch(() => {}));
+els.jumpBottomBtn.addEventListener("click", () => jumpToMessageBottom().catch(() => {}));
 els.generateDateInput.addEventListener("change", () => {
   setSelectedReportDate(els.generateDateInput.value || "");
   renderReports(cachedReports);
   refreshReportView();
 });
 els.searchInput.addEventListener("input", () => setTimeout(loadMessages, 100));
+els.feed.addEventListener("pointerdown", markFeedInteraction);
+els.feed.addEventListener("wheel", markFeedInteraction, { passive: true });
+els.feed.addEventListener("touchstart", markFeedInteraction, { passive: true });
+els.feed.addEventListener("scroll", markFeedInteraction, { passive: true });
 setInterval(() => {
   if (document.hidden) return;
   loadHealth().catch(() => {});

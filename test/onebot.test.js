@@ -26,7 +26,13 @@ function request(server, { method = "GET", path = "/", headers = {}, body } = {}
         text += chunk;
       });
       res.on("end", () => {
-        resolve({ status: res.statusCode, body: text ? JSON.parse(text) : {} });
+        let body = {};
+        try {
+          body = text ? JSON.parse(text) : {};
+        } catch {
+          body = text;
+        }
+        resolve({ status: res.statusCode, body });
       });
     });
     req.on("error", reject);
@@ -657,6 +663,39 @@ test("lists historical summaries by date", () => {
   assert.equal(reports.length, 2);
   assert.equal(reports[0].summaryDate, "2026-06-10");
   assert.equal(reports[0].status, "error");
+});
+
+test("rejects requests from hosts outside the configured allowlist", async () => {
+  const db = openDatabase(process.cwd(), ":memory:");
+  const app = createApp({
+    db,
+    config: {
+      server: { host: "127.0.0.1", port: 0, allowedHosts: ["qq.ta1zai.com", "127.0.0.1", "localhost"] },
+      admin: { password: "20018001" },
+      onebot: { wsUrl: "", accessToken: "", groupIds: ["g1"] },
+      feishu: { webhookUrl: "", secret: "" },
+      model: { provider: "ollama", baseUrl: "http://127.0.0.1:11434", model: "qwen3:8b", apiKey: "" },
+      summary: { dailyTime: "10:00", keywords: [] }
+    }
+  });
+  const server = await listen(app);
+  try {
+    const allowed = await request(server, {
+      path: "/api/health",
+      headers: { host: "qq.ta1zai.com" }
+    });
+    assert.equal(allowed.status, 200);
+    assert.equal(allowed.body.ok, true);
+
+    const denied = await request(server, {
+      path: "/api/health",
+      headers: { host: "napcat.ta1zai.com" }
+    });
+    assert.equal(denied.status, 404);
+    assert.equal(denied.body, "Not found");
+  } finally {
+    server.close();
+  }
 });
 
 test("requires admin password for manual generation and push", async () => {

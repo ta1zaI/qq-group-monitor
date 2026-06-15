@@ -77,6 +77,16 @@ function defaultGroupId(config) {
   return String(config.onebot?.groupIds?.[0] || "816998268");
 }
 
+function normalizeHost(host) {
+  return String(host || "").toLowerCase().replace(/:\d+$/, "");
+}
+
+function isAllowedHost(req, config) {
+  const allowedHosts = config.server?.allowedHosts || [];
+  if (!Array.isArray(allowedHosts) || !allowedHosts.length) return true;
+  return allowedHosts.map(normalizeHost).includes(normalizeHost(req.headers.host));
+}
+
 function isAdmin(req, config) {
   return req.headers["x-admin-password"] === String(config.admin?.password || "");
 }
@@ -532,6 +542,11 @@ function createApp({ rootDir = ROOT, config: injectedConfig, db: injectedDb } = 
 
   async function router(req, res) {
     const url = new URL(req.url, "http://localhost");
+    if (!isAllowedHost(req, config)) {
+      res.writeHead(404, { "content-type": "text/plain; charset=utf-8" });
+      res.end("Not found");
+      return;
+    }
 
     if (req.method === "GET" && url.pathname === "/api/events") {
       res.writeHead(200, {

@@ -1,7 +1,8 @@
 {
   "server": {
     "host": "127.0.0.1",
-    "port": 8787
+    "port": 8787,
+    "allowedHosts": ["qq.ta1zai.com", "127.0.0.1", "localhost"]
   },
   "admin": {
     "password": "20018001"
