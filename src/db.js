@@ -232,6 +232,21 @@ function messagesForDay(db, date, groupId = "") {
     .filter((message) => message.content);
 }
 
+function countMessagesForDay(db, date, groupId = "") {
+  const filters = ["date(sent_at, 'localtime') = ?"];
+  const params = [date];
+  if (groupId) {
+    filters.push("group_id = ?");
+    params.push(String(groupId));
+  }
+  const row = db.prepare(`
+    SELECT COUNT(*) AS count
+    FROM messages
+    WHERE ${filters.join(" AND ")}
+  `).get(...params);
+  return Number(row?.count || 0);
+}
+
 function messagesForRange(db, startAt, endAt, groupId = "") {
   const filters = ["sent_at >= ?", "sent_at < ?"];
   const params = [startAt, endAt];
@@ -316,6 +331,7 @@ module.exports = {
   insertMessage,
   listMessages,
   messagesForDay,
+  countMessagesForDay,
   messagesForRange,
   groupIdsForDay,
   groupIdsForRange,

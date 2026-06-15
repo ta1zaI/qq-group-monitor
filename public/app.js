@@ -450,9 +450,9 @@ async function loadMessages({ stickToBottom = false } = {}) {
   const scrollTop = els.feed.scrollTop;
   const wasNearBottom = isFeedNearBottom();
   try {
-    const data = await api(`/api/messages?${messageQuery({ q, limit: q ? 500 : 200 })}`);
+    const data = await api(`/api/messages?${messageQuery({ q, limit: q ? 1000 : 1000 })}`);
     loadedMessages = data.messages;
-    hasOlderMessages = data.messages.length >= (q ? 500 : 200);
+    hasOlderMessages = data.messages.length >= 1000;
     lastMessageQuery = q;
     renderMessages(loadedMessages);
     if (q) {
@@ -477,8 +477,8 @@ async function loadOlderMessages() {
   const previousHeight = els.feed.scrollHeight;
   try {
     const before = loadedMessages[0].sentAt;
-    const data = await api(`/api/messages?${messageQuery({ before, limit: 200 })}`);
-    hasOlderMessages = data.messages.length >= 200;
+    const data = await api(`/api/messages?${messageQuery({ before, limit: 1000 })}`);
+    hasOlderMessages = data.messages.length >= 1000;
     const seen = new Set(loadedMessages.map((message) => message.platformMessageId || `${message.sentAt}-${message.userId}-${message.content}`));
     const older = data.messages.filter((message) => !seen.has(message.platformMessageId || `${message.sentAt}-${message.userId}-${message.content}`));
     loadedMessages = [...older, ...loadedMessages];
@@ -565,11 +565,12 @@ async function syncHistory() {
     const data = await api("/api/messages/sync-history", {
       method: "POST",
       headers: adminHeaders(),
-      body: JSON.stringify({ groupId: GROUP_ID, count: 50000, untilDate })
+      body: JSON.stringify({ groupId: GROUP_ID, count: 100000, untilDate })
     });
     await refreshAll();
+    const countData = await api(`/api/messages/day-count?${new URLSearchParams({ group_id: GROUP_ID, date: untilDate })}`);
     const suffix = data.reachedUntilDate ? "" : "，可能还没翻到目标日期";
-    setProgress(100, `已同步 ${data.inserted} 条，读取 ${data.fetched} 条${suffix}`, data.reachedUntilDate ? "ok" : "error");
+    setProgress(100, `${untilDate} 当前 ${countData.count} 条；已新增 ${data.inserted} 条，读取 ${data.fetched} 条${suffix}`, data.reachedUntilDate ? "ok" : "error");
   } catch (error) {
     setProgress(100, error.message, "error");
   } finally {

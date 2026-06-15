@@ -9,6 +9,7 @@ const {
   insertMessage,
   listMessages,
   messagesForDay,
+  countMessagesForDay,
   groupIdsForDay,
   saveSummary,
   getSummary,
@@ -474,7 +475,7 @@ function createApp({ rootDir = ROOT, config: injectedConfig, db: injectedDb } = 
 
   async function syncGroupHistory(groupId = defaultGroupId(config), count = 1000, untilDate = "") {
     const targetGroupId = String(groupId || defaultGroupId(config));
-    const targetCount = Math.min(Math.max(Number(count) || 1000, 1), 50000);
+    const targetCount = Math.min(Math.max(Number(count) || 1000, 1), 100000);
     const stopDate = /^\d{4}-\d{2}-\d{2}$/.test(String(untilDate || "")) ? String(untilDate) : "";
     const pageSize = Math.min(targetCount, 1000);
     const messages = [];
@@ -601,6 +602,13 @@ function createApp({ rootDir = ROOT, config: injectedConfig, db: injectedDb } = 
           limit: url.searchParams.get("limit") || 200
         })
       });
+      return;
+    }
+
+    if (req.method === "GET" && url.pathname === "/api/messages/day-count") {
+      const date = url.searchParams.get("date") || localDateString();
+      const groupId = url.searchParams.get("group_id") || defaultGroupId(config);
+      json(res, 200, { date, groupId, count: countMessagesForDay(db, date, groupId) });
       return;
     }
 
