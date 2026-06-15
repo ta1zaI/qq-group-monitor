@@ -371,6 +371,49 @@ test("deduplicates text with emoji placeholders", () => {
   assert.equal(messages[0].content, "same message");
 });
 
+test("deduplicates plain at text and keeps structured mention", () => {
+  const db = openDatabase(process.cwd(), ":memory:");
+  insertMessage(db, {
+    platform: "onebot",
+    platformMessageId: "onebot-at",
+    groupId: "g1",
+    userId: "10001",
+    nickname: "player-a",
+    messageType: "at,text",
+    content: "@target 怎么做到的",
+    sentAt: "2026-06-10T08:00:01.000Z",
+    raw: {
+      message: [
+        { type: "at", data: { qq: "20002" } },
+        { type: "text", data: { text: " 怎么做到的" } }
+      ]
+    }
+  });
+  insertMessage(db, {
+    platform: "qce",
+    platformMessageId: "qce-at",
+    groupId: "g1",
+    userId: "10001",
+    nickname: "player-a",
+    messageType: "text",
+    content: "@target 怎么做到的",
+    sentAt: "2026-06-10T08:00:30.000Z",
+    raw: { message: [{ type: "text", data: { text: "@target 怎么做到的" } }] }
+  });
+
+  const applied = dedupeMessages(db, {
+    groupId: "g1",
+    startDate: "2026-06-10",
+    endDate: "2026-06-10",
+    apply: true
+  });
+  assert.equal(applied.duplicateCount, 1);
+  const messages = listMessages(db, { groupId: "g1", limit: 10 });
+  assert.equal(messages.length, 1);
+  assert.equal(messages[0].platformMessageId, "onebot-at");
+  assert.equal(messages[0].parts[0].type, "mention");
+});
+
 test("deduplicates image-only messages by sender and nearby time", () => {
   const db = openDatabase(process.cwd(), ":memory:");
   insertMessage(db, {

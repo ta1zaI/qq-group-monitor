@@ -30,16 +30,26 @@ function normalizeContent(content) {
     .replace(/\[\u56fe\u7247:\s*[^\]]+\]/g, "")
     .replace(/\[image:\s*[^\]]+\]/gi, "")
     .replace(/\s+/g, " ")
+    .replace(/^@\S+\s*/, "")
     .trim();
 }
 
-function imageNames(rawJson) {
-  let raw = {};
+function parseRaw(rawJson) {
   try {
-    raw = JSON.parse(rawJson || "{}");
+    return JSON.parse(rawJson || "{}");
   } catch {
-    return [];
+    return {};
   }
+}
+
+function hasStructuredPart(row, type) {
+  const raw = parseRaw(row.raw_json);
+  const message = raw.message;
+  return Array.isArray(message) && message.some((segment) => segment?.type === type);
+}
+
+function imageNames(rawJson) {
+  const raw = parseRaw(rawJson);
 
   const names = [];
   const visit = (node) => {
@@ -88,6 +98,8 @@ function rank(row) {
   let score = 0;
   if (row.platform === "onebot") score += 100;
   if (row.platform === "qce") score += 50;
+  if (hasStructuredPart(row, "at")) score += 30;
+  if (hasStructuredPart(row, "reply")) score += 20;
   if (hasImages(row)) score += 10;
   if (normalizeContent(row.content)) score += 5;
   return score;
