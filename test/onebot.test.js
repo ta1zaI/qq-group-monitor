@@ -730,3 +730,74 @@ test("sync history fetches multiple OneBot pages", async () => {
     globalThis.WebSocket = originalWebSocket;
   }
 });
+
+test("sync history can backfill until a selected report date", async () => {
+  const originalWebSocket = globalThis.WebSocket;
+  const sentParams = [];
+  const pageDates = ["2026-06-15T12:00:00+08:00", "2026-06-14T12:00:00+08:00", "2026-06-12T12:00:00+08:00"];
+  class FakeWebSocket {
+    static OPEN = 1;
+
+    constructor() {
+      this.readyState = FakeWebSocket.OPEN;
+      this.listeners = {};
+      setTimeout(() => this.listeners.open?.({}), 0);
+    }
+
+    addEventListener(event, listener) {
+      this.listeners[event] = listener;
+    }
+
+    send(text) {
+      const payload = JSON.parse(text);
+      sentParams.push(payload.params);
+      const pageIndex = sentParams.length - 1;
+      const start = payload.params.message_seq || 3000;
+      const time = Math.floor(new Date(pageDates[pageIndex] || pageDates.at(-1)).getTime() / 1000);
+      const messages = Array.from({ length: 1000 }, (_, index) => {
+        const id = start - index;
+        return {
+          post_type: "message",
+          message_type: "group",
+          message_id: id,
+          message_seq: id,
+          group_id: 10001,
+          user_id: 20002,
+          time,
+          sender: { nickname: "玩家A" },
+          message: [{ type: "text", data: { text: `消息 ${id}` } }]
+        };
+      });
+      setTimeout(() => {
+        this.listeners.message?.({
+          data: JSON.stringify({ echo: payload.echo, status: "ok", data: { messages } })
+        });
+      }, 0);
+    }
+  }
+  globalThis.WebSocket = FakeWebSocket;
+
+  try {
+    const db = openDatabase(process.cwd(), ":memory:");
+    const app = createApp({
+      db,
+      config: {
+        server: { host: "127.0.0.1", port: 0 },
+        admin: { password: "20018001" },
+        onebot: { wsUrl: "ws://127.0.0.1:3001", accessToken: "", groupIds: ["10001"] },
+        feishu: { webhookUrl: "", secret: "" },
+        model: { provider: "ollama", baseUrl: "http://127.0.0.1:11434", model: "qwen3:8b", apiKey: "" },
+        summary: { dailyTime: "10:00", keywords: [] }
+      }
+    });
+    app.connectOneBot();
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    const result = await app.syncGroupHistory("10001", 5000, "2026-06-13");
+    assert.equal(result.reachedUntilDate, true);
+    assert.equal(sentParams.length, 3);
+    assert.equal(result.fetched, 3000);
+  } finally {
+    globalThis.WebSocket = originalWebSocket;
+  }
+});

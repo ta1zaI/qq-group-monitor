@@ -555,18 +555,20 @@ async function pushSummary(target) {
 
 async function syncHistory() {
   saveAdminPassword();
+  const untilDate = currentReportDate();
   setActionBusy(true);
   els.syncHistoryBtn.textContent = "同步中...";
-  setProgress(20, "校验权限...");
+  setProgress(20, `校验权限：回补到 ${untilDate}`);
   try {
     setProgress(55, "从 NapCat 拉取历史...");
     const data = await api("/api/messages/sync-history", {
       method: "POST",
       headers: adminHeaders(),
-      body: JSON.stringify({ groupId: GROUP_ID, count: 10000 })
+      body: JSON.stringify({ groupId: GROUP_ID, count: 50000, untilDate })
     });
     await refreshAll();
-    setProgress(100, `已同步 ${data.inserted} 条，读取 ${data.fetched} 条`, "ok");
+    const suffix = data.reachedUntilDate ? "" : "，可能还没翻到目标日期";
+    setProgress(100, `已同步 ${data.inserted} 条，读取 ${data.fetched} 条${suffix}`, data.reachedUntilDate ? "ok" : "error");
   } catch (error) {
     setProgress(100, error.message, "error");
   } finally {

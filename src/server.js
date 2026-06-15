@@ -472,15 +472,17 @@ function createApp({ rootDir = ROOT, config: injectedConfig, db: injectedDb } = 
     }
   }
 
-  async function syncGroupHistory(groupId = defaultGroupId(config), count = 1000) {
+  async function syncGroupHistory(groupId = defaultGroupId(config), count = 1000, untilDate = "") {
     const targetGroupId = String(groupId || defaultGroupId(config));
-    const targetCount = Math.min(Math.max(Number(count) || 1000, 1), 10000);
+    const targetCount = Math.min(Math.max(Number(count) || 1000, 1), 50000);
+    const stopDate = /^\d{4}-\d{2}-\d{2}$/.test(String(untilDate || "")) ? String(untilDate) : "";
     const pageSize = Math.min(targetCount, 1000);
     const messages = [];
     const seen = new Set();
     let cursor = null;
+    let reachedUntilDate = false;
 
-    while (messages.length < targetCount) {
+    while (messages.length < targetCount && !reachedUntilDate) {
       const params = {
         group_id: Number(targetGroupId),
         count: Math.min(pageSize, targetCount - messages.length)
@@ -497,6 +499,9 @@ function createApp({ rootDir = ROOT, config: injectedConfig, db: injectedDb } = 
         seen.add(id);
         messages.push(event);
         added += 1;
+      }
+      if (stopDate) {
+        reachedUntilDate = page.some((event) => localDateString(new Date(Number(event.time || 0) * 1000)) < stopDate);
       }
 
       const oldest = page.reduce((current, event) => {
@@ -521,7 +526,7 @@ function createApp({ rootDir = ROOT, config: injectedConfig, db: injectedDb } = 
       }
     }
     if (inserted) broadcast("message", { inserted });
-    return { fetched: messages.length, inserted };
+    return { fetched: messages.length, inserted, reachedUntilDate };
   }
 
   async function router(req, res) {
@@ -603,7 +608,7 @@ function createApp({ rootDir = ROOT, config: injectedConfig, db: injectedDb } = 
       if (!requireAdmin(req, res, config)) return;
       const body = JSON.parse((await readBody(req)) || "{}");
       try {
-        const result = await syncGroupHistory(body.groupId || defaultGroupId(config), body.count || 1000);
+        const result = await syncGroupHistory(body.groupId || defaultGroupId(config), body.count || 1000, body.untilDate || "");
         json(res, 200, { ok: true, ...result });
       } catch (error) {
         json(res, 502, { error: error.message });
