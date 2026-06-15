@@ -20,9 +20,6 @@ function dateRange(startDate, endDate) {
 
 function normalizeContent(content) {
   return String(content || "")
-    .replace(/\[\u56de\u590d[^\]]*\]\s*/g, "")
-    .replace(/\[reply\]/gi, "")
-    .replace(/\[at\]/gi, "")
     .replace(/\[face\]/g, "")
     .replace(/\[\u8868\u60c5[^\]]*\]/g, "")
     .replace(/\[\u52a8\u753b\u8868\u60c5[^\]]*\]/g, "")
@@ -30,8 +27,11 @@ function normalizeContent(content) {
     .replace(/\[sticker[^\]]*\]/gi, "")
     .replace(/\[emoji[^\]]*\]/gi, "")
     .replace(/\[image\]/g, "")
-    .replace(/\[\u56fe\u7247:\s*[^\]]+\]/g, "")
+    .replace(/\[\u56fe\u7247[^\]]*\]/g, "")
     .replace(/\[image:\s*[^\]]+\]/gi, "")
+    .replace(/\[\u56de\u590d[^\]]*\]\s*/g, "")
+    .replace(/\[reply\]/gi, "")
+    .replace(/\[at\]/gi, "")
     .replace(/\s+/g, " ")
     .replace(/^@\S+\s*/, "")
     .trim();

@@ -501,6 +501,50 @@ test("deduplicates structured reply content against exported reply text", () => 
   assert.equal(messages[0].parts[0].type, "reply");
 });
 
+test("deduplicates exported reply text containing image placeholder", () => {
+  const db = openDatabase(process.cwd(), ":memory:");
+  insertMessage(db, {
+    platform: "onebot",
+    platformMessageId: "onebot-reply-image-marker",
+    groupId: "g1",
+    userId: "10002",
+    nickname: "player-b",
+    messageType: "reply,at,text",
+    content: "[reply][at] 山茶花啥效果",
+    sentAt: "2026-06-15T05:29:06.000Z",
+    raw: {
+      message: [
+        { type: "reply", data: { id: "parent" } },
+        { type: "at", data: { qq: "10001" } },
+        { type: "text", data: { text: " 山茶花啥效果" } }
+      ]
+    }
+  });
+  insertMessage(db, {
+    platform: "qce",
+    platformMessageId: "qce-reply-image-marker",
+    groupId: "g1",
+    userId: "10002",
+    nickname: "player-b",
+    messageType: "text",
+    content: "[回复 灵魂行者: [图片]] @灵魂行者 山茶花啥效果",
+    sentAt: "2026-06-15T05:29:06.000Z",
+    raw: { message: [{ type: "text", data: { text: "[回复 灵魂行者: [图片]] @灵魂行者 山茶花啥效果" } }] }
+  });
+
+  const applied = dedupeMessages(db, {
+    groupId: "g1",
+    startDate: "2026-06-15",
+    endDate: "2026-06-15",
+    apply: true
+  });
+  assert.equal(applied.duplicateCount, 1);
+  const messages = listMessages(db, { groupId: "g1", limit: 10 });
+  assert.equal(messages.length, 1);
+  assert.equal(messages[0].platformMessageId, "onebot-reply-image-marker");
+  assert.equal(messages[0].parts[0].type, "reply");
+});
+
 test("deduplicates image-only messages by sender and nearby time", () => {
   const db = openDatabase(process.cwd(), ":memory:");
   insertMessage(db, {
