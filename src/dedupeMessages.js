@@ -21,13 +21,13 @@ function dateRange(startDate, endDate) {
 function normalizeContent(content) {
   return String(content || "")
     .replace(/\[face\]/g, "")
-    .replace(/\[表情\]/g, "")
-    .replace(/\[动画表情\]/g, "")
-    .replace(/\[贴纸\]/g, "")
-    .replace(/\[sticker\]/gi, "")
-    .replace(/\[emoji\]/gi, "")
+    .replace(/\[\u8868\u60c5[^\]]*\]/g, "")
+    .replace(/\[\u52a8\u753b\u8868\u60c5[^\]]*\]/g, "")
+    .replace(/\[\u8d34\u7eb8[^\]]*\]/g, "")
+    .replace(/\[sticker[^\]]*\]/gi, "")
+    .replace(/\[emoji[^\]]*\]/gi, "")
     .replace(/\[image\]/g, "")
-    .replace(/\[图片:\s*[^\]]+\]/g, "")
+    .replace(/\[\u56fe\u7247:\s*[^\]]+\]/g, "")
     .replace(/\[image:\s*[^\]]+\]/gi, "")
     .replace(/\s+/g, " ")
     .trim();
@@ -60,15 +60,22 @@ function imageNames(rawJson) {
   return [...new Set(names)].sort();
 }
 
+function rowTime(row) {
+  const time = new Date(row.sent_at).getTime();
+  return Number.isFinite(time) ? time : 0;
+}
+
 function minuteBucket(sentAt, offsetSeconds = 0) {
-  const ms = new Date(sentAt).getTime() + offsetSeconds * 1000;
-  return Math.floor(ms / 60000);
+  return Math.floor((rowTime({ sent_at: sentAt }) + offsetSeconds * 1000) / 60000);
+}
+
+function hasImages(row) {
+  return imageNames(row.raw_json).length > 0 || String(row.message_type || "").includes("image");
 }
 
 function duplicateKey(row, offsetSeconds = 0) {
   const text = normalizeContent(row.content);
-  const hasImages = imageNames(row.raw_json).length > 0 || String(row.message_type || "").includes("image");
-  const body = text || (hasImages ? "[image]" : String(row.message_type || ""));
+  const body = text || (hasImages(row) ? "[image]" : String(row.message_type || ""));
   return [
     row.group_id,
     row.user_id,
@@ -81,12 +88,36 @@ function rank(row) {
   let score = 0;
   if (row.platform === "onebot") score += 100;
   if (row.platform === "qce") score += 50;
-  if (imageNames(row.raw_json).length) score += 10;
+  if (hasImages(row)) score += 10;
   if (normalizeContent(row.content)) score += 5;
   return score;
 }
 
+function addDuplicateGroup(duplicateIds, group) {
+  const unique = [...new Map(group.map((row) => [row.id, row])).values()];
+  if (unique.length < 2) return;
+  const sorted = unique.sort((a, b) => rank(b) - rank(a) || a.id - b.id);
+  for (const row of sorted.slice(1)) duplicateIds.add(row.id);
+}
+
+function addWindowedDuplicates(duplicateIds, groups, windowMs) {
+  for (const group of groups.values()) {
+    const sorted = group.sort((a, b) => rowTime(a) - rowTime(b) || a.id - b.id);
+    let cluster = [];
+    for (const row of sorted) {
+      if (!cluster.length || rowTime(row) - rowTime(cluster[0]) <= windowMs) {
+        cluster.push(row);
+      } else {
+        addDuplicateGroup(duplicateIds, cluster);
+        cluster = [row];
+      }
+    }
+    addDuplicateGroup(duplicateIds, cluster);
+  }
+}
+
 function findDuplicateIds(rows) {
+  const duplicateIds = new Set();
   const buckets = new Map();
   for (const row of rows) {
     for (const offset of [-30, 0, 30]) {
@@ -97,7 +128,6 @@ function findDuplicateIds(rows) {
     }
   }
 
-  const duplicateIds = new Set();
   const reviewed = new Set();
   for (const group of buckets.values()) {
     const unique = [...new Map(group.map((row) => [row.id, row])).values()];
@@ -105,14 +135,29 @@ function findDuplicateIds(rows) {
     const reviewKey = unique.map((row) => row.id).sort((a, b) => a - b).join(",");
     if (reviewed.has(reviewKey)) continue;
     reviewed.add(reviewKey);
+    addDuplicateGroup(duplicateIds, unique);
+  }
 
-    const sorted = unique.sort((a, b) => rank(b) - rank(a) || a.id - b.id);
-    const keeper = sorted[0];
-    for (const row of sorted.slice(1)) {
-      if (row.platform === keeper.platform && row.platform !== "qce") continue;
-      duplicateIds.add(row.id);
+  const textGroups = new Map();
+  const imageGroups = new Map();
+  for (const row of rows) {
+    const text = normalizeContent(row.content);
+    const day = localDay(row.sent_at);
+    if (text) {
+      const key = [row.group_id, row.user_id, day, text].join("\u001f");
+      const group = textGroups.get(key) || [];
+      group.push(row);
+      textGroups.set(key, group);
+    } else if (hasImages(row)) {
+      const key = [row.group_id, row.user_id, day, "[image]"].join("\u001f");
+      const group = imageGroups.get(key) || [];
+      group.push(row);
+      imageGroups.set(key, group);
     }
   }
+
+  addWindowedDuplicates(duplicateIds, textGroups, 5 * 60 * 1000);
+  addWindowedDuplicates(duplicateIds, imageGroups, 90 * 1000);
   return duplicateIds;
 }
 

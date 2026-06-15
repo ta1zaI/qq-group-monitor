@@ -298,7 +298,7 @@ test("deduplicates overlapping OneBot and QCE messages", () => {
     nickname: "玩家A",
     messageType: "text",
     content: "同一句话",
-    sentAt: "2026-06-10T08:00:30.000Z",
+    sentAt: "2026-06-10T08:04:30.000Z",
     raw: { message: [{ type: "text", data: { text: "同一句话" } }] }
   });
   insertMessage(db, {
@@ -332,6 +332,43 @@ test("deduplicates overlapping OneBot and QCE messages", () => {
   assert.equal(messages.length, 2);
   assert(messages.some((message) => message.platformMessageId === "onebot-1"));
   assert(messages.some((message) => message.platformMessageId === "qce-unique"));
+});
+
+test("deduplicates text with emoji placeholders", () => {
+  const db = openDatabase(process.cwd(), ":memory:");
+  insertMessage(db, {
+    platform: "onebot",
+    platformMessageId: "onebot-text",
+    groupId: "g1",
+    userId: "10001",
+    nickname: "player-a",
+    messageType: "text",
+    content: "same message",
+    sentAt: "2026-06-10T08:00:01.000Z",
+    raw: { message: [{ type: "text", data: { text: "same message" } }] }
+  });
+  insertMessage(db, {
+    platform: "qce",
+    platformMessageId: "qce-text",
+    groupId: "g1",
+    userId: "10001",
+    nickname: "player-a",
+    messageType: "text",
+    content: "same message[表情182]",
+    sentAt: "2026-06-10T08:01:01.000Z",
+    raw: { message: [{ type: "text", data: { text: "same message[表情182]" } }] }
+  });
+
+  const applied = dedupeMessages(db, {
+    groupId: "g1",
+    startDate: "2026-06-10",
+    endDate: "2026-06-10",
+    apply: true
+  });
+  assert.equal(applied.duplicateCount, 1);
+  const messages = listMessages(db, { groupId: "g1", limit: 10 });
+  assert.equal(messages.length, 1);
+  assert.equal(messages[0].content, "same message");
 });
 
 test("deduplicates image-only messages by sender and nearby time", () => {

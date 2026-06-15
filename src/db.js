@@ -117,7 +117,15 @@ function displayNameForReply(db, messageId) {
 }
 
 function stripFacePlaceholders(content) {
-  return String(content || "").replace(/\[face\]/g, "").replace(/\s+/g, " ").trim();
+  return String(content || "")
+    .replace(/\[face\]/g, "")
+    .replace(/\[\u8868\u60c5[^\]]*\]/g, "")
+    .replace(/\[\u52a8\u753b\u8868\u60c5[^\]]*\]/g, "")
+    .replace(/\[\u8d34\u7eb8[^\]]*\]/g, "")
+    .replace(/\[sticker[^\]]*\]/gi, "")
+    .replace(/\[emoji[^\]]*\]/gi, "")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function shouldHideMessage(message) {
