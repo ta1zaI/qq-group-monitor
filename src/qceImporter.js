@@ -16,6 +16,7 @@ function compact(value) {
 function firstString(...values) {
   for (const value of values) {
     if (value === undefined || value === null) continue;
+    if (typeof value === "object") continue;
     const text = compact(value);
     if (text) return text;
   }
@@ -182,14 +183,23 @@ function collectTextAndImages(value, context) {
     const text = firstString(node.text, node.content, node.value, node.summary, node.display);
     if (text && !looksImage) texts.push(text);
 
-    for (const key of ["elements", "elems", "message", "messages", "content", "items", "attachments", "files", "images"]) {
+    for (const key of ["elements", "elems", "message", "messages", "content", "items", "attachments", "files", "images", "resources"]) {
       const child = node[key];
       if (Array.isArray(child)) child.forEach(visit);
+      else if (child && typeof child === "object") visit(child);
     }
   };
 
   visit(value);
   return { texts, images };
+}
+
+function cleanQceContent(text, hasImages) {
+  const cleaned = compact(text)
+    .replace(/\[图片:\s*[^\]]+\]/g, "")
+    .replace(/\[image:\s*[^\]]+\]/gi, "")
+    .trim();
+  return cleaned || (hasImages ? "[image]" : "");
 }
 
 function normalizeQceMessage(record, options, context) {
@@ -223,8 +233,7 @@ function normalizeQceMessage(record, options, context) {
   const contentParts = [directText, ...collected.texts]
     .map((text) => compact(text))
     .filter(Boolean);
-  const content = Array.from(new Set(contentParts)).join(" ").trim()
-    || (collected.images.length ? "[image]" : "");
+  const content = cleanQceContent(Array.from(new Set(contentParts)).join(" "), collected.images.length);
   if (!content && !collected.images.length) return null;
 
   const sourceId = firstString(deepGet(record, [
