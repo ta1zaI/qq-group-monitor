@@ -4,6 +4,7 @@ const http = require("node:http");
 const { normalizeOneBotEvent, shouldAcceptGroup } = require("../src/onebot");
 const { openDatabase, insertMessage, listMessages, messagesForDay, saveSummary, listSummaries } = require("../src/db");
 const { importQceJson } = require("../src/qceImporter");
+const { dedupeMessages } = require("../src/dedupeMessages");
 const { localExtractiveSummary, analyzeMessages } = require("../src/summarizer");
 const { createApp } = require("../src/server");
 const fs = require("node:fs");
@@ -274,6 +275,100 @@ test("imports QCE JSON with local images and deduplicates", () => {
   assert.equal(message.attachments.length, 1);
   assert.match(message.attachments[0].file, /^qce-/);
   assert.match(message.avatarUrl, /q1\.qlogo\.cn/);
+});
+
+test("deduplicates overlapping OneBot and QCE messages", () => {
+  const db = openDatabase(process.cwd(), ":memory:");
+  insertMessage(db, {
+    platform: "onebot",
+    platformMessageId: "onebot-1",
+    groupId: "g1",
+    userId: "10001",
+    nickname: "玩家A",
+    messageType: "text",
+    content: "同一句话",
+    sentAt: "2026-06-10T08:00:01.000Z",
+    raw: { message: [{ type: "text", data: { text: "同一句话" } }] }
+  });
+  insertMessage(db, {
+    platform: "qce",
+    platformMessageId: "qce-1",
+    groupId: "g1",
+    userId: "10001",
+    nickname: "玩家A",
+    messageType: "text",
+    content: "同一句话",
+    sentAt: "2026-06-10T08:00:30.000Z",
+    raw: { message: [{ type: "text", data: { text: "同一句话" } }] }
+  });
+  insertMessage(db, {
+    platform: "qce",
+    platformMessageId: "qce-unique",
+    groupId: "g1",
+    userId: "10002",
+    nickname: "玩家B",
+    messageType: "text",
+    content: "只有导出里有",
+    sentAt: "2026-06-13T08:00:00.000Z",
+    raw: { message: [{ type: "text", data: { text: "只有导出里有" } }] }
+  });
+
+  const preview = dedupeMessages(db, {
+    groupId: "g1",
+    startDate: "2026-06-10",
+    endDate: "2026-06-15"
+  });
+  assert.equal(preview.duplicateCount, 1);
+  assert.equal(listMessages(db, { groupId: "g1", limit: 10 }).length, 3);
+
+  const applied = dedupeMessages(db, {
+    groupId: "g1",
+    startDate: "2026-06-10",
+    endDate: "2026-06-15",
+    apply: true
+  });
+  assert.equal(applied.duplicateCount, 1);
+  const messages = listMessages(db, { groupId: "g1", limit: 10 });
+  assert.equal(messages.length, 2);
+  assert(messages.some((message) => message.platformMessageId === "onebot-1"));
+  assert(messages.some((message) => message.platformMessageId === "qce-unique"));
+});
+
+test("deduplicates image-only messages by sender and nearby time", () => {
+  const db = openDatabase(process.cwd(), ":memory:");
+  insertMessage(db, {
+    platform: "onebot",
+    platformMessageId: "onebot-img",
+    groupId: "g1",
+    userId: "10001",
+    nickname: "玩家A",
+    messageType: "image",
+    content: "[image]",
+    sentAt: "2026-06-10T08:00:01.000Z",
+    raw: { message: [{ type: "image", data: { file: "onebot.jpg" } }] }
+  });
+  insertMessage(db, {
+    platform: "qce",
+    platformMessageId: "qce-img",
+    groupId: "g1",
+    userId: "10001",
+    nickname: "玩家A",
+    messageType: "image",
+    content: "[image]",
+    sentAt: "2026-06-10T08:00:45.000Z",
+    raw: { message: [{ type: "image", data: { file: "qce.jpg" } }] }
+  });
+
+  const applied = dedupeMessages(db, {
+    groupId: "g1",
+    startDate: "2026-06-10",
+    endDate: "2026-06-10",
+    apply: true
+  });
+  assert.equal(applied.duplicateCount, 1);
+  const messages = listMessages(db, { groupId: "g1", limit: 10 });
+  assert.equal(messages.length, 1);
+  assert.equal(messages[0].platformMessageId, "onebot-img");
 });
 
 test("returns readable mention and reply parts", () => {

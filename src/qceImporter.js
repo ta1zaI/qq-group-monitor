@@ -158,6 +158,9 @@ function collectTextAndImages(value, context) {
     if (typeof node !== "object") return;
 
     const type = compact(node.type || node.msgType || node.elemType || node.elementType).toLowerCase();
+    if (type.includes("face") || type.includes("emoji") || type.includes("sticker") || type.includes("表情")) {
+      return;
+    }
     const imageCandidate = firstString(
       node.path, node.filePath, node.localPath, node.file, node.fileName, node.name,
       node.url, node.src, node.md5, node.imagePath, node.originPath
@@ -198,6 +201,11 @@ function cleanQceContent(text, hasImages) {
   const cleaned = compact(text)
     .replace(/\[图片:\s*[^\]]+\]/g, "")
     .replace(/\[image:\s*[^\]]+\]/gi, "")
+    .replace(/\[表情\]/g, "")
+    .replace(/\[动画表情\]/g, "")
+    .replace(/\[贴纸\]/g, "")
+    .replace(/\[sticker\]/gi, "")
+    .replace(/\[emoji\]/gi, "")
     .trim();
   return cleaned || (hasImages ? "[image]" : "");
 }
