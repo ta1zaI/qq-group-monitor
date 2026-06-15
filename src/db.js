@@ -172,7 +172,10 @@ function attachMessageExtras(db, row) {
     ...message,
     content: stripFacePlaceholders(message.content),
     attachments: extractAttachments(raw),
-    parts: richParts(db, raw)
+    parts: richParts(db, raw),
+    avatarUrl: /^\d+$/.test(String(message.userId || ""))
+      ? `https://q1.qlogo.cn/g?b=qq&nk=${encodeURIComponent(String(message.userId))}&s=100`
+      : ""
   };
 }
 

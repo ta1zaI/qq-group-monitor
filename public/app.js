@@ -361,6 +361,28 @@ function renderMessages(messages) {
     const card = document.createElement("article");
     card.className = "message";
 
+    const avatar = document.createElement("div");
+    avatar.className = "message-avatar";
+    const avatarText = (msg.nickname || msg.userId || "?").trim().slice(0, 1) || "?";
+    if (msg.avatarUrl) {
+      const avatarImg = document.createElement("img");
+      avatarImg.src = msg.avatarUrl;
+      avatarImg.alt = `${msg.nickname || msg.userId || "玩家"}头像`;
+      avatarImg.loading = "lazy";
+      avatarImg.addEventListener("error", () => {
+        avatarImg.remove();
+        avatar.textContent = avatarText;
+        avatar.classList.add("fallback");
+      }, { once: true });
+      avatar.appendChild(avatarImg);
+    } else {
+      avatar.textContent = avatarText;
+      avatar.classList.add("fallback");
+    }
+
+    const body = document.createElement("div");
+    body.className = "message-body";
+
     const head = document.createElement("div");
     head.className = "message-head";
 
@@ -397,9 +419,10 @@ function renderMessages(messages) {
       media.appendChild(link);
     }
 
-    card.append(head);
-    if (content.textContent) card.appendChild(content);
-    if (images.length) card.appendChild(media);
+    body.append(head);
+    if (content.textContent) body.appendChild(content);
+    if (images.length) body.appendChild(media);
+    card.append(avatar, body);
     els.feed.appendChild(card);
   }
 }

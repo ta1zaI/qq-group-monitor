@@ -3,8 +3,12 @@ const assert = require("node:assert/strict");
 const http = require("node:http");
 const { normalizeOneBotEvent, shouldAcceptGroup } = require("../src/onebot");
 const { openDatabase, insertMessage, listMessages, messagesForDay, saveSummary, listSummaries } = require("../src/db");
+const { importQceJson } = require("../src/qceImporter");
 const { localExtractiveSummary, analyzeMessages } = require("../src/summarizer");
 const { createApp } = require("../src/server");
+const fs = require("node:fs");
+const os = require("node:os");
+const path = require("node:path");
 
 function request(server, { method = "GET", path = "/", headers = {}, body } = {}) {
   return new Promise((resolve, reject) => {
@@ -226,6 +230,50 @@ test("returns image attachments from stored OneBot messages", () => {
   assert.equal(message.attachments.length, 1);
   assert.equal(message.attachments[0].type, "image");
   assert.equal(message.attachments[0].url, "https://example.com/sample.jpg");
+});
+
+test("imports QCE JSON with local images and deduplicates", () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "qce-import-"));
+  const imagePath = path.join(tmp, "sample.png");
+  fs.writeFileSync(imagePath, Buffer.from("png"));
+  const exportPath = path.join(tmp, "export.json");
+  fs.writeFileSync(exportPath, JSON.stringify({
+    messages: [
+      {
+        messageId: "qce-1",
+        groupId: "g1",
+        time: "2026-06-13 10:00:00",
+        sender: { uin: "10001", nickname: "玩家A" },
+        content: "截图来了",
+        elements: [{ type: "image", file: "sample.png" }]
+      },
+      {
+        messageId: "qce-1",
+        groupId: "g1",
+        time: "2026-06-13 10:00:00",
+        sender: { uin: "10001", nickname: "玩家A" },
+        content: "截图来了",
+        elements: [{ type: "image", file: "sample.png" }]
+      }
+    ]
+  }));
+
+  const db = openDatabase(process.cwd(), ":memory:");
+  const result = importQceJson(db, exportPath, {
+    groupId: "g1",
+    startDate: "2026-06-10",
+    endDate: "2026-06-15",
+    exportDir: tmp,
+    mediaDir: path.join(tmp, "media")
+  });
+
+  assert.equal(result.inserted, 1);
+  assert.equal(result.duplicates, 1);
+  const [message] = listMessages(db, { groupId: "g1" });
+  assert.equal(message.nickname, "玩家A");
+  assert.equal(message.attachments.length, 1);
+  assert.match(message.attachments[0].file, /^qce-/);
+  assert.match(message.avatarUrl, /q1\.qlogo\.cn/);
 });
 
 test("returns readable mention and reply parts", () => {
