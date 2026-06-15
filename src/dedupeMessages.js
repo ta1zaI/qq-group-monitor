@@ -20,6 +20,9 @@ function dateRange(startDate, endDate) {
 
 function normalizeContent(content) {
   return String(content || "")
+    .replace(/\[\u56de\u590d[^\]]*\]\s*/g, "")
+    .replace(/\[reply\]/gi, "")
+    .replace(/\[at\]/gi, "")
     .replace(/\[face\]/g, "")
     .replace(/\[\u8868\u60c5[^\]]*\]/g, "")
     .replace(/\[\u52a8\u753b\u8868\u60c5[^\]]*\]/g, "")
@@ -152,6 +155,7 @@ function findDuplicateIds(rows) {
 
   const textGroups = new Map();
   const imageGroups = new Map();
+  const closeTextGroups = new Map();
   for (const row of rows) {
     const text = normalizeContent(row.content);
     const day = localDay(row.sent_at);
@@ -160,6 +164,11 @@ function findDuplicateIds(rows) {
       const group = textGroups.get(key) || [];
       group.push(row);
       textGroups.set(key, group);
+
+      const looseKey = [row.group_id, day, minuteBucket(row.sent_at), text].join("\u001f");
+      const looseGroup = closeTextGroups.get(looseKey) || [];
+      looseGroup.push(row);
+      closeTextGroups.set(looseKey, looseGroup);
     } else if (hasImages(row)) {
       const key = [row.group_id, row.user_id, day, "[image]"].join("\u001f");
       const group = imageGroups.get(key) || [];
@@ -169,6 +178,7 @@ function findDuplicateIds(rows) {
   }
 
   addWindowedDuplicates(duplicateIds, textGroups, 5 * 60 * 1000);
+  addWindowedDuplicates(duplicateIds, closeTextGroups, 90 * 1000);
   addWindowedDuplicates(duplicateIds, imageGroups, 90 * 1000);
   return duplicateIds;
 }

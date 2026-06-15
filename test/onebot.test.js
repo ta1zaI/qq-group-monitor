@@ -414,6 +414,93 @@ test("deduplicates plain at text and keeps structured mention", () => {
   assert.equal(messages[0].parts[0].type, "mention");
 });
 
+test("deduplicates structured at content against exported plain text", () => {
+  const db = openDatabase(process.cwd(), ":memory:");
+  insertMessage(db, {
+    platform: "onebot",
+    platformMessageId: "onebot-at-marker",
+    groupId: "g1",
+    userId: "10001",
+    nickname: "player-a",
+    messageType: "at,text",
+    content: "[at] 有几个活人？都是我们群里的嘛?",
+    sentAt: "2026-06-11T04:12:42.000Z",
+    raw: {
+      message: [
+        { type: "at", data: { qq: "20002" } },
+        { type: "text", data: { text: " 有几个活人？都是我们群里的嘛?" } }
+      ]
+    }
+  });
+  insertMessage(db, {
+    platform: "qce",
+    platformMessageId: "qce-at-marker",
+    groupId: "g1",
+    userId: "different-export-id",
+    nickname: "@.",
+    messageType: "text",
+    content: "@小豆子 有几个活人？都是我们群里的嘛?",
+    sentAt: "2026-06-11T04:12:42.000Z",
+    raw: { message: [{ type: "text", data: { text: "@小豆子 有几个活人？都是我们群里的嘛?" } }] }
+  });
+
+  const applied = dedupeMessages(db, {
+    groupId: "g1",
+    startDate: "2026-06-11",
+    endDate: "2026-06-11",
+    apply: true
+  });
+  assert.equal(applied.duplicateCount, 1);
+  const messages = listMessages(db, { groupId: "g1", limit: 10 });
+  assert.equal(messages.length, 1);
+  assert.equal(messages[0].platformMessageId, "onebot-at-marker");
+  assert.equal(messages[0].parts[0].type, "mention");
+});
+
+test("deduplicates structured reply content against exported reply text", () => {
+  const db = openDatabase(process.cwd(), ":memory:");
+  insertMessage(db, {
+    platform: "onebot",
+    platformMessageId: "onebot-reply-marker",
+    groupId: "g1",
+    userId: "10002",
+    nickname: "player-b",
+    messageType: "reply,at,text",
+    content: "[reply][at] 你用谷歌账号登，稳定不掉线。",
+    sentAt: "2026-06-11T04:13:38.000Z",
+    raw: {
+      message: [
+        { type: "reply", data: { id: "parent" } },
+        { type: "at", data: { qq: "10001" } },
+        { type: "text", data: { text: " 你用谷歌账号登，稳定不掉线。" } }
+      ]
+    }
+  });
+  insertMessage(db, {
+    platform: "qce",
+    platformMessageId: "qce-reply-marker",
+    groupId: "g1",
+    userId: "10002",
+    nickname: "player-b",
+    messageType: "text",
+    content: "[回复 不可以: 开了两把合作，都掉了] @不可以 你用谷歌账号登，稳定不掉线。",
+    sentAt: "2026-06-11T04:13:38.000Z",
+    raw: { message: [{ type: "text", data: { text: "[回复 不可以: 开了两把合作，都掉了] @不可以 你用谷歌账号登，稳定不掉线。" } }] }
+  });
+
+  const applied = dedupeMessages(db, {
+    groupId: "g1",
+    startDate: "2026-06-11",
+    endDate: "2026-06-11",
+    apply: true
+  });
+  assert.equal(applied.duplicateCount, 1);
+  const messages = listMessages(db, { groupId: "g1", limit: 10 });
+  assert.equal(messages.length, 1);
+  assert.equal(messages[0].platformMessageId, "onebot-reply-marker");
+  assert.equal(messages[0].parts[0].type, "reply");
+});
+
 test("deduplicates image-only messages by sender and nearby time", () => {
   const db = openDatabase(process.cwd(), ":memory:");
   insertMessage(db, {
