@@ -622,6 +622,42 @@ test("returns readable mention and reply parts", () => {
   assert.deepEqual(reply.parts.map((part) => part.text), ["回复 玩家甲", "@玩家甲", " 收到"]);
 });
 
+test("renders plain exported mentions as readable parts", () => {
+  const db = openDatabase(process.cwd(), ":memory:");
+  insertMessage(db, {
+    platform: "qce",
+    platformMessageId: "qce-plain-at",
+    groupId: "g1",
+    userId: "10001",
+    nickname: "玩家A",
+    messageType: "text",
+    content: "@小豆子 上了1千分，我就有点乏力了",
+    sentAt: "2026-06-14T04:00:00.000Z",
+    raw: { message: [{ type: "text", data: { text: "@小豆子 上了1千分，我就有点乏力了" } }] }
+  });
+
+  const [message] = listMessages(db, { groupId: "g1" });
+  assert.deepEqual(message.parts.map((part) => part.text), ["@小豆子", " 上了1千分，我就有点乏力了"]);
+});
+
+test("renders plain exported replies as readable parts without repeated mention", () => {
+  const db = openDatabase(process.cwd(), ":memory:");
+  insertMessage(db, {
+    platform: "qce",
+    platformMessageId: "qce-plain-reply",
+    groupId: "g1",
+    userId: "10001",
+    nickname: "玩家A",
+    messageType: "text",
+    content: "[回复 灵魂行者: [图片]] @灵魂行者 山茶花啥效果",
+    sentAt: "2026-06-14T04:00:00.000Z",
+    raw: { message: [{ type: "text", data: { text: "[回复 灵魂行者: [图片]] @灵魂行者 山茶花啥效果" } }] }
+  });
+
+  const [message] = listMessages(db, { groupId: "g1" });
+  assert.deepEqual(message.parts.map((part) => part.text), ["回复 @灵魂行者", "山茶花啥效果"]);
+});
+
 test("creates fallback summary with risks and active users", () => {
   const content = localExtractiveSummary({
     date: "2026-06-10",

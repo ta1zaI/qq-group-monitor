@@ -129,6 +129,66 @@ function stripFacePlaceholders(content) {
     .trim();
 }
 
+function findReplyPrefix(text) {
+  const source = String(text || "");
+  if (!source.startsWith("[回复 ")) return null;
+
+  let depth = 0;
+  for (let index = 0; index < source.length; index += 1) {
+    const char = source[index];
+    if (char === "[") depth += 1;
+    if (char === "]") {
+      depth -= 1;
+      if (depth === 0) {
+        const body = source.slice(1, index);
+        const match = body.match(/^回复\s+([^:：]+)[：:]/);
+        if (!match) return null;
+        return {
+          name: match[1].trim(),
+          end: index + 1
+        };
+      }
+    }
+  }
+  return null;
+}
+
+function appendTextPart(parts, text) {
+  if (!text) return;
+  const previous = parts[parts.length - 1];
+  if (previous?.type === "text") {
+    previous.text += text;
+  } else {
+    parts.push({ type: "text", text });
+  }
+}
+
+function richPartsFromPlainText(content) {
+  let text = stripFacePlaceholders(content);
+  const parts = [];
+  const reply = findReplyPrefix(text);
+  let replyName = "";
+
+  if (reply) {
+    replyName = reply.name.replace(/^@/, "");
+    parts.push({ type: "reply", text: `回复 @${replyName}` });
+    text = text.slice(reply.end).trimStart();
+    const repeatedMention = new RegExp(`^@${replyName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*`);
+    text = text.replace(repeatedMention, "");
+  }
+
+  const mentionPattern = /@([^\s@：:，,。?？!！\]]+)/g;
+  let cursor = 0;
+  for (const match of text.matchAll(mentionPattern)) {
+    appendTextPart(parts, text.slice(cursor, match.index));
+    parts.push({ type: "mention", text: `@${match[1]}` });
+    cursor = match.index + match[0].length;
+  }
+  appendTextPart(parts, text.slice(cursor));
+
+  return parts.some((part) => part.type === "mention" || part.type === "reply") ? parts : [];
+}
+
 function shouldHideMessage(message) {
   const cleaned = stripFacePlaceholders(message.content);
   const hasAttachments = Array.isArray(message.attachments) && message.attachments.length > 0;
@@ -166,7 +226,8 @@ function richParts(db, rawJson) {
     }
   }
 
-  return parts;
+  if (parts.some((part) => part.type === "mention" || part.type === "reply")) return parts;
+  return richPartsFromPlainText(parts.map((part) => part.text || "").join(""));
 }
 
 function attachMessageExtras(db, row) {
