@@ -500,13 +500,15 @@ function createApp({ rootDir = ROOT, config: injectedConfig, db: injectedDb } = 
       }
 
       const oldest = page.reduce((current, event) => {
-        const currentTime = Number(current?.time ?? 0);
-        const eventTime = Number(event?.time ?? 0);
-        return !current || eventTime < currentTime ? event : current;
+        const currentSeq = Number(current?.message_seq ?? current?.message_id ?? current?.time ?? 0);
+        const eventSeq = Number(event?.message_seq ?? event?.message_id ?? event?.time ?? 0);
+        return !current || eventSeq < currentSeq ? event : current;
       }, null);
       const nextCursor = Number(oldest?.message_seq ?? oldest?.message_id);
-      if (!added || page.length < pageSize || !Number.isFinite(nextCursor) || nextCursor === cursor) break;
-      cursor = nextCursor;
+      if (!added || page.length < params.count || !Number.isFinite(nextCursor) || nextCursor <= 1) break;
+      const previousCursor = nextCursor - 1;
+      if (previousCursor === cursor) break;
+      cursor = previousCursor;
     }
 
     let inserted = 0;

@@ -563,7 +563,7 @@ async function syncHistory() {
     const data = await api("/api/messages/sync-history", {
       method: "POST",
       headers: adminHeaders(),
-      body: JSON.stringify({ groupId: GROUP_ID, count: 5000 })
+      body: JSON.stringify({ groupId: GROUP_ID, count: 10000 })
     });
     await refreshAll();
     setProgress(100, `已同步 ${data.inserted} 条，读取 ${data.fetched} 条`, "ok");

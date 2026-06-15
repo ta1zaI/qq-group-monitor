@@ -679,7 +679,7 @@ test("sync history fetches multiple OneBot pages", async () => {
     send(text) {
       const payload = JSON.parse(text);
       sentParams.push(payload.params);
-      const start = payload.params.message_seq ? 1000 : 2000;
+      const start = payload.params.message_seq || 2000;
       const size = payload.params.message_seq ? 1 : 1000;
       const messages = Array.from({ length: size }, (_, index) => {
         const id = start - index;
@@ -724,7 +724,7 @@ test("sync history fetches multiple OneBot pages", async () => {
     assert.equal(result.fetched, 1001);
     assert.equal(result.inserted, 1001);
     assert.equal(sentParams.length, 2);
-    assert.equal(sentParams[1].message_seq, 1001);
+    assert.equal(sentParams[1].message_seq, 1000);
     assert.equal(listMessages(db, { groupId: "10001", limit: 5000 }).length, 1001);
   } finally {
     globalThis.WebSocket = originalWebSocket;
