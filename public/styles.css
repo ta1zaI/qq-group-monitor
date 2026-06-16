@@ -324,7 +324,7 @@ button:disabled {
 .admin-login {
   margin-top: 10px;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 72px;
+  grid-template-columns: minmax(0, 1fr) 88px;
   gap: 8px;
 }
 
@@ -336,6 +336,7 @@ button:disabled {
 
 .admin-login button {
   font-weight: 700;
+  white-space: nowrap;
   background: #263247;
 }
 
