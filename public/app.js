@@ -195,9 +195,21 @@ function renderReportContent(text) {
   els.summaryBox.innerHTML = "";
   const lines = cleanReportDisplayText(text).split(/\r?\n/);
   let list = null;
+  let insideSummarySection = false;
 
   const closeList = () => {
     list = null;
+  };
+
+  const appendBullet = (text) => {
+    if (!list) {
+      list = document.createElement("ul");
+      list.className = "report-bullets";
+      els.summaryBox.appendChild(list);
+    }
+    const item = document.createElement("li");
+    appendInlineText(item, text);
+    list.appendChild(item);
   };
 
   for (const rawLine of lines) {
@@ -213,6 +225,7 @@ function renderReportContent(text) {
     const heading = line.match(/^(#{1,2})\s*(.+)$/);
     if (heading) {
       closeList();
+      insideSummarySection = false;
       const level = heading[1].length === 1 ? "h1" : "h2";
       const node = document.createElement(level);
       appendInlineText(node, heading[2]);
@@ -222,6 +235,7 @@ function renderReportContent(text) {
 
     if (line.startsWith("QQ群玩家日报｜")) {
       closeList();
+      insideSummarySection = false;
       const node = document.createElement("h1");
       node.textContent = line;
       els.summaryBox.appendChild(node);
@@ -230,6 +244,7 @@ function renderReportContent(text) {
 
     if (SUMMARY_SECTIONS.has(line)) {
       closeList();
+      insideSummarySection = true;
       const node = document.createElement("h2");
       node.textContent = line;
       els.summaryBox.appendChild(node);
@@ -253,18 +268,17 @@ function renderReportContent(text) {
 
     const listItem = line.match(/^(?:[-*]|\d+[.)、])\s*(.+)$/);
     if (listItem) {
-      if (!list) {
-        list = document.createElement("ul");
-        list.className = "report-bullets";
-        els.summaryBox.appendChild(list);
-      }
-      const item = document.createElement("li");
-      appendInlineText(item, listItem[1]);
-      list.appendChild(item);
+      appendBullet(listItem[1]);
+      continue;
+    }
+
+    if (insideSummarySection) {
+      appendBullet(line);
       continue;
     }
 
     closeList();
+    insideSummarySection = false;
     appendParagraph(els.summaryBox, line);
   }
 }
