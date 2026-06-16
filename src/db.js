@@ -119,9 +119,12 @@ function displayNameForReply(db, messageId) {
 function stripFacePlaceholders(content) {
   return String(content || "")
     .replace(/\[face\]/g, "")
+    .replace(/\[at\]/gi, "")
+    .replace(/\[reply\]/gi, "")
     .replace(/\[\u8868\u60c5[^\]]*\]/g, "")
     .replace(/\[\u52a8\u753b\u8868\u60c5[^\]]*\]/g, "")
     .replace(/\[\u8d34\u7eb8[^\]]*\]/g, "")
+    .replace(/\[(?:\u7728\u773c|\u8c03\u76ae|\u5927\u7b11|\u5fae\u7b11|\u6d41\u6cea|\u53d1\u5446|\u53ef\u7231|\u8272|\u5f97\u610f|\u95ed\u5634|\u7761|\u5c34\u5c2c|\u594b\u6597|\u8870|\u7591\u95ee|\u563f\u54c8|\u6342\u8138|\u9f13\u638c|\u5410|\u518d\u89c1|\u6d41\u6c57|\u53d1\u6296|\u5de6\u54fc\u54fc|\u53f3\u54fc\u54fc|\u62b1\u62f3|\u62e5\u62b1|\u5455\u5410|\u9634\u9669|\u4eb2\u4eb2|\u5413|\u53ef\u601c)[^\]]*\]/g, "")
     .replace(/\[sticker[^\]]*\]/gi, "")
     .replace(/\[emoji[^\]]*\]/gi, "")
     .replace(/\[\u56fe\u7247[^\]]*\]/g, "")

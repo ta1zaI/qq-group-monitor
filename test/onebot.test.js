@@ -5,7 +5,7 @@ const { normalizeOneBotEvent, shouldAcceptGroup } = require("../src/onebot");
 const { openDatabase, insertMessage, listMessages, listMessagesPage, messagesForDay, saveSummary, listSummaries } = require("../src/db");
 const { importQceJson } = require("../src/qceImporter");
 const { dedupeMessages } = require("../src/dedupeMessages");
-const { localExtractiveSummary, analyzeMessages } = require("../src/summarizer");
+const { localExtractiveSummary, analyzeMessages, sanitizeSummaryContent } = require("../src/summarizer");
 const { createApp } = require("../src/server");
 const fs = require("node:fs");
 const os = require("node:os");
@@ -1261,4 +1261,26 @@ test("sync history can backfill until a selected report date", async () => {
   } finally {
     globalThis.WebSocket = originalWebSocket;
   }
+});
+
+test("strips report-only mention and emoji placeholders from summary inputs and output", () => {
+  const db = openDatabase(process.cwd(), ":memory:");
+  insertMessage(db, {
+    platformMessageId: "m-report-noise",
+    groupId: "g1",
+    userId: "u1",
+    nickname: "player",
+    messageType: "text",
+    content: "[at] 那你就登录不就好了 [眨眼]",
+    sentAt: "2026-06-10T08:00:00.000Z",
+    raw: {}
+  });
+
+  const dayMessages = messagesForDay(db, "2026-06-10", "g1");
+  assert.equal(dayMessages[0].content, "那你就登录不就好了");
+
+  const summary = sanitizeSummaryContent("代表性发言 / 玩家反馈\n黄瓜米：[at] 那你就登录不就好了 [眨眼]", "2026-06-10");
+  assert(!summary.includes("[at]"));
+  assert(!summary.includes("[眨眼]"));
+  assert(summary.includes("那你就登录不就好了"));
 });
