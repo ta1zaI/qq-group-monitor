@@ -148,6 +148,15 @@ const SUMMARY_SECTIONS = new Set([
   "建议关注动作"
 ]);
 
+const SECTION_FALLBACK_LABELS = {
+  "一句话总结": ["概况", "主题", "重点"],
+  "代表性发言 / 玩家反馈": ["反馈", "反馈", "反馈"],
+  "全群问题 / 风险": ["风险", "问题", "影响"],
+  "舆论": ["情绪", "活跃", "倾向"],
+  "平衡性 / 夸大与失真": ["判断", "争议", "核查"],
+  "建议关注动作": ["FAQ", "追问", "升级"]
+};
+
 function appendInlineText(parent, text) {
   const parts = String(text || "").split(/(\*\*[^*]+\*\*)/g);
   for (const part of parts) {
@@ -175,6 +184,17 @@ function appendParagraph(container, text) {
   container.appendChild(p);
 }
 
+function hasInlineTitle(text) {
+  return /^([^：:]{2,24})([：:])(.+)$/.test(String(text || ""));
+}
+
+function withFallbackSectionTitle(section, index, text) {
+  if (!section || hasInlineTitle(text)) return text;
+  const labels = SECTION_FALLBACK_LABELS[section] || ["重点", "补充", "关注"];
+  const label = labels[Math.min(index, labels.length - 1)];
+  return `${label}：${text}`;
+}
+
 function cleanReportDisplayText(text) {
   return String(text || "")
     .replace(/\[回复[^\n]*?\]\]\s*/g, "")
@@ -195,7 +215,8 @@ function renderReportContent(text) {
   els.summaryBox.innerHTML = "";
   const lines = cleanReportDisplayText(text).split(/\r?\n/);
   let list = null;
-  let insideSummarySection = false;
+  let currentSection = "";
+  const sectionItemCounts = {};
 
   const closeList = () => {
     list = null;
@@ -208,7 +229,14 @@ function renderReportContent(text) {
       els.summaryBox.appendChild(list);
     }
     const item = document.createElement("li");
-    appendInlineText(item, text);
+    const title = String(text || "").match(/^([^：:]{2,24})([：:])(.+)$/);
+    if (title) {
+      const strong = document.createElement("strong");
+      strong.textContent = `${title[1]}${title[2]}`;
+      item.append(strong, document.createTextNode(title[3]));
+    } else {
+      appendInlineText(item, text);
+    }
     list.appendChild(item);
   };
 
@@ -225,7 +253,7 @@ function renderReportContent(text) {
     const heading = line.match(/^(#{1,2})\s*(.+)$/);
     if (heading) {
       closeList();
-      insideSummarySection = false;
+      currentSection = "";
       const level = heading[1].length === 1 ? "h1" : "h2";
       const node = document.createElement(level);
       appendInlineText(node, heading[2]);
@@ -235,7 +263,7 @@ function renderReportContent(text) {
 
     if (line.startsWith("QQ群玩家日报｜")) {
       closeList();
-      insideSummarySection = false;
+      currentSection = "";
       const node = document.createElement("h1");
       node.textContent = line;
       els.summaryBox.appendChild(node);
@@ -244,7 +272,8 @@ function renderReportContent(text) {
 
     if (SUMMARY_SECTIONS.has(line)) {
       closeList();
-      insideSummarySection = true;
+      currentSection = line;
+      sectionItemCounts[currentSection] = 0;
       const node = document.createElement("h2");
       node.textContent = line;
       els.summaryBox.appendChild(node);
@@ -263,22 +292,27 @@ function renderReportContent(text) {
       strong.textContent = `${titledItem[1]}${titledItem[2]}`;
       item.append(strong, document.createTextNode(titledItem[3]));
       list.appendChild(item);
+      if (currentSection) sectionItemCounts[currentSection] += 1;
       continue;
     }
 
     const listItem = line.match(/^(?:[-*]|\d+[.)、])\s*(.+)$/);
     if (listItem) {
-      appendBullet(listItem[1]);
+      const itemText = withFallbackSectionTitle(currentSection, sectionItemCounts[currentSection] || 0, listItem[1]);
+      appendBullet(itemText);
+      if (currentSection) sectionItemCounts[currentSection] += 1;
       continue;
     }
 
-    if (insideSummarySection) {
-      appendBullet(line);
+    if (currentSection) {
+      const itemText = withFallbackSectionTitle(currentSection, sectionItemCounts[currentSection] || 0, line);
+      appendBullet(itemText);
+      sectionItemCounts[currentSection] += 1;
       continue;
     }
 
     closeList();
-    insideSummarySection = false;
+    currentSection = "";
     appendParagraph(els.summaryBox, line);
   }
 }

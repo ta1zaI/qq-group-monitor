@@ -12,6 +12,15 @@ const SUMMARY_SECTIONS = [
   "建议关注动作"
 ];
 
+const SECTION_FALLBACK_LABELS = {
+  "一句话总结": ["概况", "主题", "重点"],
+  "代表性发言 / 玩家反馈": ["反馈", "反馈", "反馈"],
+  "全群问题 / 风险": ["风险", "问题", "影响"],
+  "舆论": ["情绪", "活跃", "倾向"],
+  "平衡性 / 夸大与失真": ["判断", "争议", "核查"],
+  "建议关注动作": ["FAQ", "追问", "升级"]
+};
+
 function stripReportNoise(text) {
   return String(text || "")
     .replace(/\[回复[^\n]*?\]\]\s*/g, "")
@@ -64,6 +73,7 @@ QQ群玩家日报｜${date}
 格式要求：
 不要输出 Markdown。不要使用 #、##、**、-、*、1. 这类符号。
 每个栏目下面写 1 到 3 行，每行使用“标题：内容”的形式。
+一句话总结优先使用“概况：”“主题：”；全群问题 / 风险使用“风险：”；舆论使用“情绪：”“活跃：”；平衡性 / 夸大与失真使用“判断：”；建议关注动作使用“FAQ：”“追问：”“升级：”。
 代表性发言可以写“玩家名：原话或概括”，不要写成项目符号。
 直接给运营判断，不要写“根据对话内容”“以下是整理”这类开场白。
 不要编造不存在的玩家、官方回应或数据。
@@ -94,6 +104,17 @@ function cleanReportLine(line) {
   return /^[^：:]{2,24}[：:]\s*$/.test(cleaned) ? "" : cleaned;
 }
 
+function hasInlineTitle(line) {
+  return /^([^：:]{2,24})([：:])(.+)$/.test(String(line || ""));
+}
+
+function withFallbackSectionTitle(section, index, line) {
+  if (!section || hasInlineTitle(line)) return line;
+  const labels = SECTION_FALLBACK_LABELS[section] || ["重点", "补充", "关注"];
+  const label = labels[Math.min(index, labels.length - 1)];
+  return `${label}：${line}`;
+}
+
 function sanitizeSummaryContent(content, date) {
   const cleaned = stripThinking(content)
     .split(/\r?\n/)
@@ -101,6 +122,8 @@ function sanitizeSummaryContent(content, date) {
     .filter(Boolean);
   const output = [];
   let hasTitle = false;
+  let currentSection = "";
+  const sectionItemCounts = {};
 
   for (const line of cleaned) {
     if (/^根据对话内容/.test(line) || /^以下是/.test(line) || /^总结建议/.test(line)) continue;
@@ -112,7 +135,19 @@ function sanitizeSummaryContent(content, date) {
       }
       continue;
     }
-    output.push(line);
+    if (SUMMARY_SECTIONS.includes(line)) {
+      currentSection = line;
+      sectionItemCounts[currentSection] = 0;
+      output.push(line);
+      continue;
+    }
+    const normalizedLine = withFallbackSectionTitle(
+      currentSection,
+      sectionItemCounts[currentSection] || 0,
+      line
+    );
+    output.push(normalizedLine);
+    if (currentSection) sectionItemCounts[currentSection] += 1;
   }
 
   if (!hasTitle) output.unshift(`QQ群玩家日报｜${date}`);

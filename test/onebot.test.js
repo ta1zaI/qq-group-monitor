@@ -91,6 +91,22 @@ test("removes report placeholders that should never appear in daily summaries", 
   assert(summary.includes("\u9a8c\u8bc1\u7801\u767b\u5f55"));
 });
 
+test("adds fallback labels to unlabeled summary section lines", () => {
+  const content = [
+    "\u4e00\u53e5\u8bdd\u603b\u7ed3",
+    "\u5361\u724c\u5f3a\u5ea6\u4e89\u8bae\u4e0e\u670d\u52a1\u5668\u9650\u5236\u6210\u4e3a\u7126\u70b9",
+    "\u8206\u8bba",
+    "\u591a\u6570\u73a9\u5bb6\u8ba4\u4e3a\u68c9\u82b1\u3001\u5c71\u7af9\u7b49\u5361\u724c\u5f3a\u5ea6\u8fc7\u9ad8",
+    "\u5efa\u8bae\u5173\u6ce8\u52a8\u4f5c",
+    "\u5173\u6ce8\u5361\u724c\u5f3a\u5ea6\u8c03\u6574\u9700\u6c42"
+  ].join("\n");
+
+  const summary = sanitizeSummaryContent(content, "2026-06-15");
+  assert(summary.includes("\u6982\u51b5\uff1a\u5361\u724c\u5f3a\u5ea6\u4e89\u8bae\u4e0e\u670d\u52a1\u5668\u9650\u5236\u6210\u4e3a\u7126\u70b9"));
+  assert(summary.includes("\u60c5\u7eea\uff1a\u591a\u6570\u73a9\u5bb6\u8ba4\u4e3a\u68c9\u82b1\u3001\u5c71\u7af9\u7b49\u5361\u724c\u5f3a\u5ea6\u8fc7\u9ad8"));
+  assert(summary.includes("FAQ\uff1a\u5173\u6ce8\u5361\u724c\u5f3a\u5ea6\u8c03\u6574\u9700\u6c42"));
+});
+
 test("ignores face-only messages and keeps text next to faces", () => {
   const faceOnly = normalizeOneBotEvent({
     post_type: "message",
