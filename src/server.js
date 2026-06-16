@@ -18,7 +18,7 @@ const {
   stats
 } = require("./db");
 const { normalizeOneBotEvent, shouldAcceptGroup } = require("./onebot");
-const { generateSummary, analyzeMessages } = require("./summarizer");
+const { generateSummary, analyzeMessages, sanitizeSummaryContent } = require("./summarizer");
 
 const ROOT = path.resolve(__dirname, "..");
 const PUBLIC = path.join(ROOT, "public");
@@ -418,7 +418,8 @@ function createApp({ rootDir = ROOT, config: injectedConfig, db: injectedDb } = 
   }
 
   function buildFeishuCard(summary, window) {
-    const lines = String(summary.content || "").split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+    const content = sanitizeSummaryContent(summary.content || "", window.label);
+    const lines = content.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
     const titlePattern = /^(?:QQ群玩家日报：?.*|一句话总结|代表性发言 \/ 玩家反馈|全群问题 \/ 风险|舆论|平衡性 \/ 夸大与失真|建议关注动作)$/;
     const elements = [];
     let currentTitle = "";
@@ -453,7 +454,7 @@ function createApp({ rootDir = ROOT, config: injectedConfig, db: injectedDb } = 
     if (!elements.length) {
       elements.push({
         tag: "div",
-        text: { tag: "lark_md", content: summary.content || "暂无日报内容" }
+        text: { tag: "lark_md", content: content || "暂无日报内容" }
       });
     }
 

@@ -908,6 +908,59 @@ test("pushes saved summary to configured Feishu webhook", async () => {
   }
 });
 
+test("cleans stored group labels before pushing saved summary to Feishu", async () => {
+  const db = openDatabase(process.cwd(), ":memory:");
+  saveSummary(db, {
+    groupId: "816998268",
+    date: "2026-06-10",
+    content: [
+      "\u0051\u0051\u7fa4\u73a9\u5bb6\u65e5\u62a5\uff5c2026-06-10",
+      "\u4e00\u53e5\u8bdd\u603b\u7ed3",
+      "\u6982\u51b5\uff1a\u6837\u672c\u91cf\u53ef\u7528\u4e8e\u57fa\u7840\u8fd0\u8425\u5224\u65ad\u3002 \u4eca\u65e5\u7fa4",
+      "816998268 \u5171 28 \u6761\u6d88\u606f\u30015 \u4f4d\u6d3b\u8dc3\u73a9\u5bb6\u3002"
+    ].join("\n")
+  });
+  const calls = [];
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (url, options) => {
+    calls.push({ url: String(url), body: JSON.parse(options.body) });
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({ code: 0, msg: "ok" })
+    };
+  };
+
+  const app = createApp({
+    db,
+    config: {
+      server: { host: "127.0.0.1", port: 0 },
+      admin: { password: "20018001" },
+      onebot: { wsUrl: "", accessToken: "", groupIds: ["816998268"] },
+      feishu: { webhookUrl: "https://open.feishu.cn/webhook/test", secret: "" },
+      model: { provider: "ollama", baseUrl: "http://127.0.0.1:11434", model: "qwen3:8b", apiKey: "" },
+      summary: { dailyTime: "10:00", keywords: [] }
+    }
+  });
+  const server = await listen(app);
+  try {
+    const pushed = await request(server, {
+      method: "POST",
+      path: "/api/summary/push",
+      headers: { "content-type": "application/json", "x-admin-password": "20018001" },
+      body: { date: "2026-06-10", groupId: "816998268" }
+    });
+    assert.equal(pushed.status, 200);
+    const cardText = JSON.stringify(calls[0].body.card);
+    assert.match(cardText, /\u4eca\u65e5\u5171 28 \u6761\u6d88\u606f/);
+    assert.doesNotMatch(cardText, /816998268/);
+    assert.doesNotMatch(cardText, /\u4eca\u65e5\u7fa4/);
+  } finally {
+    globalThis.fetch = originalFetch;
+    server.close();
+  }
+});
+
 test("pushes saved summary to official Feishu webhook when requested", async () => {
   const db = openDatabase(process.cwd(), ":memory:");
   saveSummary(db, { groupId: "g1", date: "2026-06-10", content: "日报正文" });
