@@ -364,23 +364,25 @@ button:disabled {
 
 .content-panels {
   --report-panel-width: 46%;
+  position: relative;
   min-height: 0;
-  display: flex;
+  display: block;
   width: 100%;
-  flex-wrap: nowrap;
-  gap: 8px;
   padding: 12px;
   overflow: hidden;
-  align-items: stretch;
 }
 
 .panel-resizer {
-  position: relative;
-  flex: 0 0 10px;
+  position: absolute;
+  top: 12px;
+  bottom: 12px;
+  left: calc(12px + var(--report-panel-width));
+  width: 10px;
   cursor: col-resize;
   touch-action: none;
   border-radius: 999px;
   outline: none;
+  z-index: 3;
 }
 
 .panel-resizer::before {
@@ -420,12 +422,20 @@ button:disabled {
 }
 
 .report-card {
-  flex: 0 0 var(--report-panel-width);
+  position: absolute;
+  top: 12px;
+  bottom: 12px;
+  left: 12px;
+  width: var(--report-panel-width);
   min-width: 320px;
 }
 
 .messages-card {
-  flex: 1 1 0;
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  bottom: 12px;
+  left: calc(22px + var(--report-panel-width));
   min-width: 360px;
   grid-template-rows: auto auto minmax(0, 1fr);
 }
@@ -796,7 +806,7 @@ code {
   }
 
   .content-panels {
-    display: flex;
+    display: block;
     overflow: hidden;
   }
 
@@ -825,6 +835,7 @@ code {
 
 @media (max-width: 760px) {
   .content-panels {
+    display: flex;
     flex-direction: column;
     overflow: visible;
   }
@@ -835,6 +846,8 @@ code {
 
   .report-card,
   .messages-card {
+    position: static;
+    width: auto;
     flex: none;
     min-width: 0;
   }

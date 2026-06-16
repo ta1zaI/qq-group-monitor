@@ -175,9 +175,25 @@ function appendParagraph(container, text) {
   container.appendChild(p);
 }
 
+function cleanReportDisplayText(text) {
+  return String(text || "")
+    .replace(/\[回复[^\n]*?\]\]\s*/g, "")
+    .replace(/\[回复[^\]]*\]\s*/g, "")
+    .replace(/\[(?:at|reply|face)\]/gi, "")
+    .replace(/\[\/?(?:image|sticker|emoji)[^\]]*\]/gi, "")
+    .replace(/\[\u56fe\u7247[^\]]*\]/g, "")
+    .replace(/\[\u8868\u60c5[^\]]*\]/g, "")
+    .replace(/\[\u52a8\u753b\u8868\u60c5[^\]]*\]/g, "")
+    .replace(/\[\u8d34\u7eb8[^\]]*\]/g, "")
+    .replace(/\[\/?[\u4e00-\u9fff]{1,12}\]/g, "")
+    .replace(/@[\w.\-\u4e00-\u9fff]{1,24}\s*/g, "")
+    .replace(/[ \t]{2,}/g, " ")
+    .trim();
+}
+
 function renderReportContent(text) {
   els.summaryBox.innerHTML = "";
-  const lines = String(text || "").split(/\r?\n/);
+  const lines = cleanReportDisplayText(text).split(/\r?\n/);
   let list = null;
 
   const closeList = () => {

@@ -128,6 +128,7 @@ function stripFacePlaceholders(content) {
     .replace(/\[sticker[^\]]*\]/gi, "")
     .replace(/\[emoji[^\]]*\]/gi, "")
     .replace(/\[\u56fe\u7247[^\]]*\]/g, "")
+    .replace(/\[\/?[\u4e00-\u9fff]{1,12}\]/g, "")
     .replace(/\s+/g, " ")
     .trim();
 }

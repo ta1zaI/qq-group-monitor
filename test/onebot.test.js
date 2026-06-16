@@ -72,6 +72,24 @@ test("normalizes OneBot group text messages", () => {
   assert.equal(msg.messageType, "text");
 });
 
+test("removes report placeholders that should never appear in daily summaries", () => {
+  const content = [
+    "\u4ee3\u8868\u6027\u53d1\u8a00 / \u73a9\u5bb6\u53cd\u9988",
+    "\u4e5d\u4e5d\u4e0e\u5979\uff1a[/\u7741\u773c]",
+    "\u9ec4\u74dc\u7c73\uff1a[at] @\u7075\u9b42\u884c\u8005 [image] \u90a3\u4f60\u5c31\u767b\u5f55\u4e0d\u5c31\u597d\u4e86",
+    "\u9ec4\u74dc\u7c73\uff1a[\u56fe\u7247] \u9a8c\u8bc1\u7801\u767b\u5f55"
+  ].join("\n");
+
+  const summary = sanitizeSummaryContent(content, "2026-06-15");
+  assert(!summary.includes("[/\u7741\u773c]"));
+  assert(!summary.includes("[at]"));
+  assert(!summary.includes("@\u7075\u9b42\u884c\u8005"));
+  assert(!summary.includes("[image]"));
+  assert(!summary.includes("[\u56fe\u7247]"));
+  assert(summary.includes("\u90a3\u4f60\u5c31\u767b\u5f55\u4e0d\u5c31\u597d\u4e86"));
+  assert(summary.includes("\u9a8c\u8bc1\u7801\u767b\u5f55"));
+});
+
 test("ignores face-only messages and keeps text next to faces", () => {
   const faceOnly = normalizeOneBotEvent({
     post_type: "message",

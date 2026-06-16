@@ -14,14 +14,17 @@ const SUMMARY_SECTIONS = [
 
 function stripReportNoise(text) {
   return String(text || "")
-    .replace(/\[at\]/gi, "")
-    .replace(/\[reply\]/gi, "")
-    .replace(/\[face\]/gi, "")
-    .replace(/\[image\]/gi, "图片")
+    .replace(/\[回复[^\n]*?\]\]\s*/g, "")
+    .replace(/\[回复[^\]]*\]\s*/g, "")
+    .replace(/\[(?:at|reply|face)\]/gi, "")
+    .replace(/\[\/?(?:image|sticker|emoji)[^\]]*\]/gi, "")
+    .replace(/\[\u56fe\u7247[^\]]*\]/g, "")
     .replace(/\[\u8868\u60c5[^\]]*\]/g, "")
     .replace(/\[\u52a8\u753b\u8868\u60c5[^\]]*\]/g, "")
     .replace(/\[\u8d34\u7eb8[^\]]*\]/g, "")
     .replace(/\[(?:\u7728\u773c|\u8c03\u76ae|\u5927\u7b11|\u5fae\u7b11|\u6d41\u6cea|\u53d1\u5446|\u53ef\u7231|\u8272|\u5f97\u610f|\u95ed\u5634|\u7761|\u5c34\u5c2c|\u594b\u6597|\u8870|\u7591\u95ee|\u563f\u54c8|\u6342\u8138|\u9f13\u638c|\u5410|\u518d\u89c1|\u6d41\u6c57|\u53d1\u6296|\u5de6\u54fc\u54fc|\u53f3\u54fc\u54fc|\u62b1\u62f3|\u62e5\u62b1|\u5455\u5410|\u9634\u9669|\u4eb2\u4eb2|\u5413|\u53ef\u601c)[^\]]*\]/g, "")
+    .replace(/\[\/?[\u4e00-\u9fff]{1,12}\]/g, "")
+    .replace(/@[\w.\-\u4e00-\u9fff]{1,24}\s*/g, "")
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -29,20 +32,9 @@ function stripReportNoise(text) {
 function compactMessageLine(msg) {
   const name = msg.nickname || msg.userId || "未知玩家";
   const time = String(msg.sentAt || "").slice(11, 16);
-  const content = String(msg.content || `[${msg.messageType || "unknown"}]`)
-    .replace(/\s+/g, " ")
-    .replace(/\[image\]/g, "图片")
-    .trim()
-    .replace(/\[at\]/gi, "")
-    .replace(/\[reply\]/gi, "")
-    .replace(/\[face\]/gi, "")
-    .replace(/\[\u8868\u60c5[^\]]*\]/g, "")
-    .replace(/\[\u52a8\u753b\u8868\u60c5[^\]]*\]/g, "")
-    .replace(/\[\u8d34\u7eb8[^\]]*\]/g, "")
-    .replace(/\[(?:\u7728\u773c|\u8c03\u76ae|\u5927\u7b11|\u5fae\u7b11|\u6d41\u6cea|\u53d1\u5446|\u53ef\u7231|\u8272|\u5f97\u610f|\u95ed\u5634|\u7761|\u5c34\u5c2c|\u594b\u6597|\u8870|\u7591\u95ee|\u563f\u54c8|\u6342\u8138|\u9f13\u638c|\u5410|\u518d\u89c1|\u6d41\u6c57|\u53d1\u6296|\u5de6\u54fc\u54fc|\u53f3\u54fc\u54fc|\u62b1\u62f3|\u62e5\u62b1|\u5455\u5410|\u9634\u9669|\u4eb2\u4eb2|\u5413|\u53ef\u601c)[^\]]*\]/g, "")
-    .trim()
-    .slice(0, 90);
-  return `${time} ${name}: ${content || `[${msg.messageType || "unknown"}]`}`;
+  const content = stripReportNoise(msg.content).slice(0, 90);
+  if (!content) return "";
+  return `${time} ${name}: ${content}`;
 }
 
 function buildPrompt({ date, groupId, messages, keywords }) {
@@ -50,6 +42,7 @@ function buildPrompt({ date, groupId, messages, keywords }) {
   let totalLength = 0;
   for (const msg of messages) {
     const line = compactMessageLine(msg);
+    if (!line) continue;
     totalLength += line.length + 1;
     if (totalLength > 9000) break;
     lines.push(line);
