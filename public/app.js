@@ -2,6 +2,7 @@ const GROUP_ID = "816998268";
 const MESSAGE_PAGE_SIZE = 100;
 const MESSAGE_SEARCH_LIMIT = 1000;
 const FEED_INTERACTION_IDLE_MS = 1200;
+const PANEL_WIDTH_STORAGE_KEY = "qq-monitor-report-panel-width";
 
 const els = {
   status: document.querySelector("#status"),
@@ -27,6 +28,8 @@ const els = {
   summaryBox: document.querySelector("#summaryBox"),
   reportCount: document.querySelector("#reportCount"),
   reportList: document.querySelector("#reportList"),
+  contentPanels: document.querySelector(".content-panels"),
+  panelResizer: document.querySelector("#panelResizer"),
   messageCount: document.querySelector("#messageCount"),
   feed: document.querySelector("#feed"),
   loadOlderBtn: document.querySelector("#loadOlderBtn"),
@@ -485,6 +488,74 @@ function shouldDeferMessageRefresh(force, q) {
   return !force && !q && feedInteractionActive && !isFeedNearBottom();
 }
 
+function isPanelResizeEnabled() {
+  return els.contentPanels && els.panelResizer && !window.matchMedia("(max-width: 1180px)").matches;
+}
+
+function clampReportPanelWidth(width) {
+  const rect = els.contentPanels.getBoundingClientRect();
+  const resizerWidth = els.panelResizer.offsetWidth || 10;
+  const gapAllowance = 16;
+  const minReport = Math.min(320, Math.max(240, rect.width * 0.38));
+  const minMessages = Math.min(360, Math.max(260, rect.width * 0.34));
+  const maxReport = Math.max(minReport, rect.width - resizerWidth - gapAllowance - minMessages);
+  return Math.min(Math.max(width, minReport), maxReport);
+}
+
+function setReportPanelWidth(width, persist = true) {
+  if (!isPanelResizeEnabled()) return;
+  const nextWidth = `${Math.round(clampReportPanelWidth(width))}px`;
+  els.contentPanels.style.setProperty("--report-panel-width", nextWidth);
+  if (persist) localStorage.setItem(PANEL_WIDTH_STORAGE_KEY, nextWidth);
+}
+
+function currentReportPanelWidth() {
+  const reportCard = els.contentPanels?.querySelector(".report-card");
+  return reportCard?.getBoundingClientRect().width || 0;
+}
+
+function restorePanelWidth() {
+  const savedWidth = localStorage.getItem(PANEL_WIDTH_STORAGE_KEY);
+  if (!savedWidth || !els.contentPanels) return;
+  els.contentPanels.style.setProperty("--report-panel-width", savedWidth);
+}
+
+function startPanelResize(event) {
+  if (!isPanelResizeEnabled()) return;
+  event.preventDefault();
+  els.contentPanels.classList.add("is-resizing");
+  els.panelResizer.setPointerCapture?.(event.pointerId);
+
+  const resize = (clientX) => {
+    const rect = els.contentPanels.getBoundingClientRect();
+    setReportPanelWidth(clientX - rect.left);
+  };
+
+  const onPointerMove = (moveEvent) => resize(moveEvent.clientX);
+  const onPointerUp = () => {
+    els.contentPanels.classList.remove("is-resizing");
+    window.removeEventListener("pointermove", onPointerMove);
+  };
+
+  window.addEventListener("pointermove", onPointerMove);
+  window.addEventListener("pointerup", onPointerUp, { once: true });
+  window.addEventListener("pointercancel", onPointerUp, { once: true });
+  resize(event.clientX);
+}
+
+function handlePanelResizeKey(event) {
+  if (!isPanelResizeEnabled()) return;
+  const step = event.shiftKey ? 64 : 24;
+  if (event.key === "ArrowLeft") {
+    event.preventDefault();
+    setReportPanelWidth(currentReportPanelWidth() - step);
+  }
+  if (event.key === "ArrowRight") {
+    event.preventDefault();
+    setReportPanelWidth(currentReportPanelWidth() + step);
+  }
+}
+
 async function loadMessages({ stickToBottom = false, force = false } = {}) {
   if (loadingMessages) return;
   const q = els.searchInput.value.trim();
@@ -669,6 +740,12 @@ els.feed.addEventListener("pointerdown", markFeedInteraction);
 els.feed.addEventListener("wheel", markFeedInteraction, { passive: true });
 els.feed.addEventListener("touchstart", markFeedInteraction, { passive: true });
 els.feed.addEventListener("scroll", markFeedInteraction, { passive: true });
+restorePanelWidth();
+els.panelResizer?.addEventListener("pointerdown", startPanelResize);
+els.panelResizer?.addEventListener("keydown", handlePanelResizeKey);
+window.addEventListener("resize", () => {
+  if (isPanelResizeEnabled()) setReportPanelWidth(currentReportPanelWidth(), false);
+});
 setInterval(() => {
   if (document.hidden) return;
   loadHealth().catch(() => {});

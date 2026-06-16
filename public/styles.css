@@ -363,12 +363,48 @@ button:disabled {
 }
 
 .content-panels {
+  --report-panel-width: 46%;
   min-height: 0;
   display: grid;
-  grid-template-columns: minmax(360px, 0.92fr) minmax(420px, 1.08fr);
-  gap: 12px;
+  grid-template-columns: minmax(320px, var(--report-panel-width)) 10px minmax(360px, 1fr);
+  gap: 8px;
   padding: 12px;
   overflow: hidden;
+}
+
+.panel-resizer {
+  position: relative;
+  min-width: 10px;
+  cursor: col-resize;
+  touch-action: none;
+  border-radius: 999px;
+  outline: none;
+}
+
+.panel-resizer::before {
+  content: "";
+  position: absolute;
+  top: 10px;
+  bottom: 10px;
+  left: 50%;
+  width: 2px;
+  transform: translateX(-50%);
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.28);
+  transition: width 0.16s ease, background 0.16s ease, box-shadow 0.16s ease;
+}
+
+.panel-resizer:hover::before,
+.panel-resizer:focus-visible::before,
+.content-panels.is-resizing .panel-resizer::before {
+  width: 4px;
+  background: linear-gradient(180deg, rgba(85, 214, 194, 0.95), rgba(117, 167, 255, 0.95));
+  box-shadow: 0 0 18px rgba(85, 214, 194, 0.22);
+}
+
+.content-panels.is-resizing,
+.content-panels.is-resizing * {
+  user-select: none;
 }
 
 .report-card, .messages-card {
@@ -401,6 +437,7 @@ button:disabled {
   min-height: 0;
   padding: 18px;
   overflow: auto;
+  scrollbar-gutter: stable;
   color: #dbe6f6;
   font-family: inherit;
   font-size: 15px;
@@ -467,6 +504,49 @@ button:disabled {
   gap: 10px;
   align-content: start;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.report-list,
+.right-rail,
+.report-content,
+.message-feed {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.55) rgba(10, 16, 28, 0.32);
+}
+
+.report-list::-webkit-scrollbar,
+.right-rail::-webkit-scrollbar,
+.report-content::-webkit-scrollbar,
+.message-feed::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.report-list::-webkit-scrollbar-track,
+.right-rail::-webkit-scrollbar-track,
+.report-content::-webkit-scrollbar-track,
+.message-feed::-webkit-scrollbar-track {
+  border-radius: 999px;
+  background: rgba(10, 16, 28, 0.3);
+}
+
+.report-list::-webkit-scrollbar-thumb,
+.right-rail::-webkit-scrollbar-thumb,
+.report-content::-webkit-scrollbar-thumb,
+.message-feed::-webkit-scrollbar-thumb {
+  min-height: 42px;
+  border: 2px solid rgba(10, 16, 28, 0.65);
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(85, 214, 194, 0.68), rgba(117, 167, 255, 0.68));
+}
+
+.report-list::-webkit-scrollbar-thumb:hover,
+.right-rail::-webkit-scrollbar-thumb:hover,
+.report-content::-webkit-scrollbar-thumb:hover,
+.message-feed::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, rgba(85, 214, 194, 0.92), rgba(117, 167, 255, 0.92));
 }
 
 .load-older-btn {
@@ -714,6 +794,10 @@ code {
   .content-panels {
     grid-template-columns: 1fr;
     overflow: visible;
+  }
+
+  .panel-resizer {
+    display: none;
   }
 
   .stage-toolbar {
