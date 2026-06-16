@@ -112,7 +112,11 @@
           <h2>日报生成</h2>
           <p>定时生成已保留，定时推送已关闭；输入管理员密码后可手动生成或推送。</p>
           <input id="generateDateInput" type="date" aria-label="生成日期" />
-          <input id="adminPassword" type="password" placeholder="管理员密码" autocomplete="current-password" />
+          <div class="admin-login">
+            <input id="adminPassword" type="password" placeholder="管理员密码" autocomplete="current-password" />
+            <button id="adminVerifyBtn" type="button">登录</button>
+          </div>
+          <p id="adminVerifyState" class="admin-verify-state">输入密码后点击登录</p>
           <div id="adminActions" class="admin-actions">
             <button id="generateBtn" type="button" class="primary-action">生成日报</button>
             <button id="testPushBtn" type="button">测试推送</button>
@@ -157,6 +161,6 @@
       <img id="imageModalImg" alt="图片预览" />
     </div>
 
-    <script src="/app.js?v=20260616-admin-verify"></script>
+    <script src="/app.js?v=20260616-admin-login-cache"></script>
   </body>
 </html>

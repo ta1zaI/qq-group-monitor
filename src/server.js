@@ -317,8 +317,17 @@ function createApp({ rootDir = ROOT, config: injectedConfig, db: injectedDb } = 
   let onebotState = { connected: false, lastError: "", lastEventAt: "" };
   let onebotSocket = null;
   let actionSeq = 0;
-  let cachedGroupMemberCount = null;
+  const cachedGroupMemberCounts = new Map();
+  const dashboardCache = new Map();
   const pendingActions = new Map();
+
+  function dashboardCacheKey(groupId, date) {
+    return `${groupId}:${date}`;
+  }
+
+  function clearDashboardCache(groupId, date) {
+    if (groupId && date) dashboardCache.delete(dashboardCacheKey(String(groupId), String(date)));
+  }
 
   function broadcast(event, payload) {
     const line = `event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`;
@@ -330,6 +339,7 @@ function createApp({ rootDir = ROOT, config: injectedConfig, db: injectedDb } = 
     if (!msg || !shouldAcceptGroup(config, msg.groupId)) return false;
     const inserted = insertMessage(db, msg);
     if (inserted) {
+      clearDashboardCache(msg.groupId, String(msg.sentAt || "").slice(0, 10));
       cacheMessageMedia(rootDir, msg).catch(() => {});
       broadcast("message", msg);
     }
@@ -351,18 +361,43 @@ function createApp({ rootDir = ROOT, config: injectedConfig, db: injectedDb } = 
     });
   }
 
-  async function getGroupMemberCount(groupId = defaultGroupId(config)) {
+  async function refreshGroupMemberCount(groupId = defaultGroupId(config)) {
+    const targetGroupId = String(groupId || defaultGroupId(config));
     try {
       const response = await sendOneBotAction("get_group_info", {
-        group_id: Number(groupId),
+        group_id: Number(targetGroupId),
         no_cache: false
-      });
+      }, 1200);
       const count = Number(response?.data?.member_count);
-      if (Number.isFinite(count) && count >= 0) cachedGroupMemberCount = count;
+      if (Number.isFinite(count) && count >= 0) cachedGroupMemberCounts.set(targetGroupId, count);
     } catch {
       // Keep the last successful member count when OneBot is unavailable.
     }
-    return cachedGroupMemberCount;
+    return cachedGroupMemberCounts.get(targetGroupId) ?? null;
+  }
+
+  async function getGroupMemberCount(groupId = defaultGroupId(config), waitMs = 180) {
+    const targetGroupId = String(groupId || defaultGroupId(config));
+    const cached = cachedGroupMemberCounts.get(targetGroupId) ?? null;
+    const pending = refreshGroupMemberCount(targetGroupId);
+    if (!waitMs) return cached;
+    return Promise.race([
+      pending,
+      new Promise((resolve) => setTimeout(() => resolve(cached), waitMs))
+    ]);
+  }
+
+  function dashboardForDate(date, groupId) {
+    const key = dashboardCacheKey(groupId, date);
+    const cached = dashboardCache.get(key);
+    if (cached) return cached;
+    const messages = messagesForDay(db, date, groupId);
+    const value = {
+      analysis: analyzeMessages(messages, config.summary?.keywords || []),
+      computedAt: new Date().toISOString()
+    };
+    dashboardCache.set(key, value);
+    return value;
   }
 
   function feishuWebhookForTarget(target = "test") {
@@ -532,14 +567,17 @@ function createApp({ rootDir = ROOT, config: injectedConfig, db: injectedDb } = 
     }
 
     let inserted = 0;
+    const changedDates = new Set();
     for (const event of messages) {
       const msg = normalizeOneBotEvent(event);
       if (!msg || !shouldAcceptGroup(config, msg.groupId)) continue;
       if (insertMessage(db, msg)) {
         inserted += 1;
+        changedDates.add(String(msg.sentAt || "").slice(0, 10));
         cacheMessageMedia(rootDir, msg).catch(() => {});
       }
     }
+    for (const date of changedDates) clearDashboardCache(targetGroupId, date);
     if (inserted) broadcast("message", { inserted });
     return { fetched: messages.length, inserted, reachedUntilDate };
   }
@@ -649,13 +687,14 @@ function createApp({ rootDir = ROOT, config: injectedConfig, db: injectedDb } = 
       const date = url.searchParams.get("date") || localDateString();
       const groupId = url.searchParams.get("group_id") || defaultGroupId(config);
       const window = reportWindowForDate(date);
-      const messages = messagesForDay(db, window.date, groupId);
+      const dashboard = dashboardForDate(window.date, groupId);
       json(res, 200, {
         date,
         groupId,
         window,
-        groupMemberCount: await getGroupMemberCount(groupId),
-        analysis: analyzeMessages(messages, config.summary?.keywords || []),
+        groupMemberCount: await getGroupMemberCount(groupId, 180),
+        analysis: dashboard.analysis,
+        cachedAt: dashboard.computedAt,
         summary: getSummary(db, window.date, groupId)
       });
       return;

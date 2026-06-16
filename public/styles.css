@@ -321,11 +321,48 @@ button:disabled {
   width: 100%;
 }
 
+.admin-login {
+  margin-top: 10px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 72px;
+  gap: 8px;
+}
+
+.admin-login input,
+.admin-login button {
+  width: 100%;
+  min-width: 0;
+}
+
+.admin-login button {
+  font-weight: 700;
+  background: #263247;
+}
+
+.admin-verify-state {
+  min-height: 20px;
+  margin-top: 8px;
+  margin-bottom: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.admin-verify-state.ok {
+  color: #5eead4;
+}
+
+.admin-verify-state.warn {
+  color: #fbbf24;
+}
+
+.admin-verify-state.error {
+  color: #fca5a5;
+}
+
 .admin-actions.is-hidden {
   display: none;
 }
 
-.action-card #adminPassword,
 .action-card #testPushBtn,
 .action-card #officialPushBtn,
 .action-card #syncHistoryBtn {
