@@ -489,7 +489,7 @@ function shouldDeferMessageRefresh(force, q) {
 }
 
 function isPanelResizeEnabled() {
-  return els.contentPanels && els.panelResizer && !window.matchMedia("(max-width: 1180px)").matches;
+  return els.contentPanels && els.panelResizer && !window.matchMedia("(max-width: 760px)").matches;
 }
 
 function clampReportPanelWidth(width) {

@@ -365,9 +365,7 @@ button:disabled {
 .content-panels {
   --report-panel-width: 46%;
   min-height: 0;
-  display: grid;
-  grid-template-columns: minmax(320px, var(--report-panel-width)) 10px minmax(360px, 1fr);
-  grid-template-rows: minmax(0, 1fr);
+  display: flex;
   gap: 8px;
   padding: 12px;
   overflow: hidden;
@@ -376,9 +374,7 @@ button:disabled {
 
 .panel-resizer {
   position: relative;
-  grid-column: 2;
-  grid-row: 1;
-  min-width: 10px;
+  flex: 0 0 10px;
   cursor: col-resize;
   touch-action: none;
   border-radius: 999px;
@@ -422,15 +418,13 @@ button:disabled {
 }
 
 .report-card {
-  grid-column: 1;
-  grid-row: 1;
-  min-width: 0;
+  flex: 0 0 var(--report-panel-width);
+  min-width: 320px;
 }
 
 .messages-card {
-  grid-column: 3;
-  grid-row: 1;
-  min-width: 0;
+  flex: 1 1 0;
+  min-width: 360px;
   grid-template-rows: auto auto minmax(0, 1fr);
 }
 
@@ -800,19 +794,17 @@ code {
   }
 
   .content-panels {
-    grid-template-columns: 1fr;
-    grid-template-rows: auto auto;
-    overflow: visible;
+    display: flex;
+    overflow: hidden;
   }
 
   .panel-resizer {
-    display: none;
+    display: block;
   }
 
   .report-card,
   .messages-card {
-    grid-column: auto;
-    grid-row: auto;
+    min-width: 0;
   }
 
   .stage-toolbar {
@@ -826,5 +818,22 @@ code {
 
   input, button {
     width: 100%;
+  }
+}
+
+@media (max-width: 760px) {
+  .content-panels {
+    flex-direction: column;
+    overflow: visible;
+  }
+
+  .panel-resizer {
+    display: none;
+  }
+
+  .report-card,
+  .messages-card {
+    flex: none;
+    min-width: 0;
   }
 }
