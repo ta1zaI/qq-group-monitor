@@ -206,6 +206,9 @@ function renderReportContent(text) {
       closeList();
       continue;
     }
+    if (/^[^：:]{2,24}[：:]\s*$/.test(line)) {
+      continue;
+    }
 
     const heading = line.match(/^(#{1,2})\s*(.+)$/);
     if (heading) {

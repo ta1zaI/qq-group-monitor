@@ -84,13 +84,14 @@ function stripThinking(text) {
 }
 
 function cleanReportLine(line) {
-  return stripReportNoise(line)
+  const cleaned = stripReportNoise(line)
     .trim()
     .replace(/^#{1,6}\s*/, "")
     .replace(/^\s*(?:[-*_]{2,}|[-*]|[一二三四五六七八九十]+[、.．]|\d+[.)、])\s*/, "")
     .replace(/\*\*/g, "")
     .replace(/`/g, "")
     .trim();
+  return /^[^：:]{2,24}[：:]\s*$/.test(cleaned) ? "" : cleaned;
 }
 
 function sanitizeSummaryContent(content, date) {

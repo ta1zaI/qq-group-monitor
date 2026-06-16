@@ -81,6 +81,7 @@ test("removes report placeholders that should never appear in daily summaries", 
   ].join("\n");
 
   const summary = sanitizeSummaryContent(content, "2026-06-15");
+  assert(!summary.includes("\u4e5d\u4e5d\u4e0e\u5979\uff1a"));
   assert(!summary.includes("[/\u7741\u773c]"));
   assert(!summary.includes("[at]"));
   assert(!summary.includes("@\u7075\u9b42\u884c\u8005"));
