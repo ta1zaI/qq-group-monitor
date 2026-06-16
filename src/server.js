@@ -301,7 +301,10 @@ function serveStatic(req, res) {
     ".css": "text/css; charset=utf-8",
     ".js": "application/javascript; charset=utf-8"
   }[ext] || "application/octet-stream";
-  res.writeHead(200, { "content-type": contentType });
+  res.writeHead(200, {
+    "content-type": contentType,
+    "cache-control": "no-store"
+  });
   fs.createReadStream(resolved).pipe(res);
 }
 

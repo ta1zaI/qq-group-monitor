@@ -366,6 +366,8 @@ button:disabled {
   --report-panel-width: 46%;
   min-height: 0;
   display: flex;
+  width: 100%;
+  flex-wrap: nowrap;
   gap: 8px;
   padding: 12px;
   overflow: hidden;
