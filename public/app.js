@@ -49,6 +49,9 @@ let loadingMessages = false;
 let feedInteractionTimer = null;
 let feedInteractionActive = false;
 let pendingMessageRefresh = false;
+let adminVerified = false;
+let adminVerifyTimer = null;
+let adminVerifyRequestId = 0;
 
 function today() {
   const d = new Date();
@@ -111,6 +114,10 @@ function saveAdminPassword() {
   localStorage.setItem("qq-monitor-admin-password", els.adminPassword.value);
 }
 
+function clearAdminPassword() {
+  localStorage.removeItem("qq-monitor-admin-password");
+}
+
 function setPill(node, text, state = "ok") {
   node.textContent = text;
   node.className = state;
@@ -131,12 +138,56 @@ function setActionBusy(busy) {
 }
 
 function updateAdminActionsVisibility() {
-  els.adminActions.classList.toggle("is-hidden", !els.adminPassword.value.trim());
+  els.adminActions.classList.toggle("is-hidden", !adminVerified);
+}
+
+async function verifyAdminPassword({ silent = false } = {}) {
+  const password = els.adminPassword.value.trim();
+  const requestId = ++adminVerifyRequestId;
+  adminVerified = false;
+  updateAdminActionsVisibility();
+  if (!password) {
+    clearAdminPassword();
+    if (!silent) setProgress(0, "需要管理员密码");
+    return false;
+  }
+  if (!silent) setProgress(35, "验证管理员密码...");
+  try {
+    await api("/api/admin/verify", {
+      method: "POST",
+      headers: adminHeaders(),
+      body: "{}"
+    });
+    if (requestId !== adminVerifyRequestId) return false;
+    adminVerified = true;
+    saveAdminPassword();
+    updateAdminActionsVisibility();
+    if (!silent) setProgress(100, "管理员已验证", "ok");
+    return true;
+  } catch {
+    if (requestId !== adminVerifyRequestId) return false;
+    adminVerified = false;
+    clearAdminPassword();
+    updateAdminActionsVisibility();
+    if (!silent) setProgress(100, "管理员密码错误", "error");
+    return false;
+  }
 }
 
 function handleAdminPasswordInput() {
-  saveAdminPassword();
+  adminVerified = false;
   updateAdminActionsVisibility();
+  clearTimeout(adminVerifyTimer);
+  const password = els.adminPassword.value.trim();
+  if (!password) {
+    clearAdminPassword();
+    setProgress(0, "需要管理员密码");
+    return;
+  }
+  setProgress(20, "等待验证管理员密码...");
+  adminVerifyTimer = setTimeout(() => {
+    verifyAdminPassword().catch(() => {});
+  }, 350);
 }
 
 const SUMMARY_SECTIONS = new Set([
@@ -695,7 +746,7 @@ async function refreshReportView() {
 }
 
 async function generateSummary() {
-  saveAdminPassword();
+  if (!adminVerified && !(await verifyAdminPassword())) return;
   const date = els.generateDateInput.value || today();
   setActionBusy(true);
   els.generateBtn.textContent = "生成中...";
@@ -724,7 +775,7 @@ async function generateSummary() {
 }
 
 async function pushSummary(target) {
-  saveAdminPassword();
+  if (!adminVerified && !(await verifyAdminPassword())) return;
   const date = currentReportDate();
   setActionBusy(true);
   const button = target === "official" ? els.officialPushBtn : els.testPushBtn;
@@ -749,7 +800,7 @@ async function pushSummary(target) {
 }
 
 async function syncHistory() {
-  saveAdminPassword();
+  if (!adminVerified && !(await verifyAdminPassword())) return;
   const untilDate = els.generateDateInput.value || currentReportDate();
   setActionBusy(true);
   els.syncHistoryBtn.textContent = "同步中...";
@@ -789,6 +840,7 @@ els.generateDateInput.value = today();
 setSelectedReportDate("");
 els.adminPassword.value = localStorage.getItem("qq-monitor-admin-password") || "";
 updateAdminActionsVisibility();
+if (els.adminPassword.value.trim()) verifyAdminPassword({ silent: true }).catch(() => {});
 els.refreshBtn.addEventListener("click", refreshAll);
 els.adminPassword.addEventListener("input", handleAdminPasswordInput);
 els.generateBtn.addEventListener("click", generateSummary);
